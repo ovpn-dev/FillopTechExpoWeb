@@ -1,13 +1,14 @@
-// Main App Structure
-// CBTApp.tsx - Main container component
-import React, { useState } from "react";
-import { View } from "react-native";
-import Sidebar from "../components/Sidebar";
-import TopBar from "../components/TopBar";
-import Dashboard from "../screens/Dashboard";
-import ExamScreen from "../screens/ExamScreen";
-import InstructionScreen from "../screens/InstructionScreen";
-import ResultScreen from "../screens/ResultScreen";
+// cbtApp.tsx - Updated Main App with Authentication Integration
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { Text, View } from "react-native";
+import Sidebar from "./components/Sidebar";
+import TopBar from "./components/TopBar";
+import { useAuth } from "./contexts/AuthContext";
+import Dashboard from "./screens/Dashboard";
+import ExamScreen from "./screens/ExamScreen";
+import InstructionScreen from "./screens/InstructionScreen";
+import ResultScreen from "./screens/ResultScreen";
 
 export type ExamMode = "TIMED" | "UNTIMED" | "STUDY" | "NEWS";
 export type ExamType = "JAMB" | "WAEC" | "NECO" | "NABTEB" | "OTHER";
@@ -39,7 +40,11 @@ export interface ExamResults {
   answers: { [questionId: string]: string };
 }
 
-const CBTApp: React.FC = () => {
+// Main CBT App Component (wrapped with auth)
+const CBTAppContent: React.FC = () => {
+  const router = useRouter();
+  const { authState, logout } = useAuth();
+
   const [currentScreen, setCurrentScreen] = useState<AppScreen>("dashboard");
   const [examConfig, setExamConfig] = useState<ExamConfig | null>(null);
   const [examResults, setExamResults] = useState<ExamResults | null>(null);
@@ -50,17 +55,50 @@ const CBTApp: React.FC = () => {
   }>({});
   const [examStartTime, setExamStartTime] = useState<number | null>(null);
 
-  // Navigation handlers
+  // Check authentication on component mount
+  useEffect(() => {
+    if (!authState.isAuthenticated) {
+      console.log("User not authenticated, redirecting to login");
+      router.push("/");
+    }
+  }, [authState.isAuthenticated, router]);
+
+  // Handle logout from sidebar
+  const handleLogout = async () => {
+    await logout();
+    // Reset all exam state
+    setCurrentScreen("dashboard");
+    setExamConfig(null);
+    setExamResults(null);
+    setUserAnswers({});
+    setCurrentQuestionInSubject(0);
+    setCurrentSubject("");
+    setExamStartTime(null);
+    // Navigate back to login
+    router.push("/");
+  };
+
+  // Helper function to check if timer should be used
+  const shouldUseTimer = (mode: ExamMode): boolean => {
+    return mode === "TIMED";
+  };
+
+  // Navigation handlers (unchanged)
   const handleStartExamSetup = (config: ExamConfig) => {
     setExamConfig(config);
-    setCurrentSubject(config.subjects[0]); // Start with first subject
+    setCurrentSubject(config.subjects[0]);
     setCurrentScreen("instructions");
   };
 
   const handleStartExam = () => {
     setCurrentScreen("exam");
     setCurrentQuestionInSubject(0);
-    setExamStartTime(Date.now()); // Start timer only when exam begins
+
+    if (examConfig && shouldUseTimer(examConfig.mode)) {
+      setExamStartTime(Date.now());
+    } else {
+      setExamStartTime(null);
+    }
   };
 
   const handleBackNavigation = () => {
@@ -71,7 +109,7 @@ const CBTApp: React.FC = () => {
         break;
       case "exam":
         setCurrentScreen("instructions");
-        setExamStartTime(null); // Reset timer
+        setExamStartTime(null);
         break;
       case "results":
         setCurrentScreen("dashboard");
@@ -84,36 +122,36 @@ const CBTApp: React.FC = () => {
   };
 
   const handleSubmitExam = () => {
-    console.log("=== SUBMIT EXAM TRIGGERED ===");
-    console.log(
-      "Current userAnswers:",
-      Object.keys(userAnswers).length,
-      "answers"
-    );
+    console.log("=== SUBMIT EXAM HANDLER CALLED ===");
+    console.log("Current userAnswers count:", Object.keys(userAnswers).length);
     console.log("ExamConfig subjects:", examConfig?.subjects);
+    console.log("Current screen:", currentScreen);
+    console.log("User:", authState.user?.firstName, authState.user?.lastName);
 
-    const timeUsed = examStartTime
-      ? Math.floor((Date.now() - examStartTime) / 1000)
-      : 0;
+    if (!examConfig) {
+      console.error("No exam config available!");
+      return;
+    }
 
-    // Calculate results based on current userAnswers state
-    const totalQuestions = examConfig ? examConfig.subjects.length * 40 : 0;
+    let timeUsed = 0;
+    if (shouldUseTimer(examConfig.mode) && examStartTime) {
+      timeUsed = Math.floor((Date.now() - examStartTime) / 1000);
+    }
+
+    const totalQuestions = examConfig.subjects.length * 40;
     let correctAnswers = 0;
     const subjectBreakdown: {
       [subject: string]: { correct: number; total: number };
     } = {};
 
-    // Initialize subject breakdown
-    examConfig?.subjects.forEach((subject) => {
+    examConfig.subjects.forEach((subject) => {
       subjectBreakdown[subject] = { correct: 0, total: 40 };
     });
 
-    // Mock calculation - replace with real logic
-    examConfig?.subjects.forEach((subject) => {
+    examConfig.subjects.forEach((subject) => {
       for (let i = 1; i <= 40; i++) {
         const questionId = `${subject}_q_${i}`;
         if (userAnswers[questionId]) {
-          // Mock: assume 70% of answered questions are correct
           if (Math.random() > 0.3) {
             correctAnswers++;
             subjectBreakdown[subject].correct++;
@@ -130,7 +168,7 @@ const CBTApp: React.FC = () => {
       answers: userAnswers,
     };
 
-    console.log("Calculated results:", results);
+    console.log("Final calculated results:", results);
     setExamResults(results);
     setCurrentScreen("results");
   };
@@ -183,6 +221,24 @@ const CBTApp: React.FC = () => {
     }
   };
 
+  // Show loading while checking authentication
+  if (authState.isLoading) {
+    return (
+      <View className="flex-1 bg-gray-100 items-center justify-center">
+        <Text className="text-xl text-gray-600">Loading...</Text>
+      </View>
+    );
+  }
+
+  // If not authenticated, show nothing (will redirect)
+  if (!authState.isAuthenticated) {
+    return (
+      <View className="flex-1 bg-gray-100 items-center justify-center">
+        <Text className="text-xl text-gray-600">Redirecting to login...</Text>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-gray-100">
       {/* Header - conditional based on screen */}
@@ -190,24 +246,31 @@ const CBTApp: React.FC = () => {
         <TopBar
           examConfig={examConfig}
           showSubmit={currentScreen === "exam"}
-          onSubmit={handleSubmitExam} // Direct function reference, no closure
+          onSubmit={handleSubmitExam}
           onBack={handleBackNavigation}
           currentSubject={currentSubject}
           onSubjectChange={setCurrentSubject}
           examStartTime={examStartTime}
-          showTimer={currentScreen === "exam"} // Only show active timer in exam
+          showTimer={
+            currentScreen === "exam" && shouldUseTimer(examConfig.mode)
+          }
         />
       )}
 
-      <View className="flex-1 flex-row">
+      <View className="flex-1 flex-row w-full">
         {/* Main Content */}
-        <View className="flex-1">{renderMainContent()}</View>
+        <View className="flex-1 w-[80%]">{renderMainContent()}</View>
 
-        {/* Persistent Sidebar */}
-        <Sidebar />
+        {/* Persistent Sidebar with logout functionality */}
+        <Sidebar onLogout={handleLogout} />
       </View>
     </View>
   );
+};
+
+// Main export component (AuthProvider now in _layout.tsx)
+const CBTApp: React.FC = () => {
+  return <CBTAppContent />;
 };
 
 export default CBTApp;
