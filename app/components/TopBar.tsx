@@ -1,7 +1,16 @@
-// components/TopBar.tsx - Updated with Calculator Integration
+// components/TopBar.tsx - Updated with extracted utilities
 import React, { useEffect, useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
-import { ExamConfig } from "../cbtApp";
+
+// Import our new utilities and types
+import { ExamConfig } from "../utils/examValidator";
+import {
+  formatTime,
+  getTimeDisplayBackground,
+  getTimeDisplayColor,
+} from "../utils/timeFormatter";
+
+// Import existing components
 import Calculator from "./Calculator";
 import ConfirmModal from "./ConfirmModal";
 
@@ -49,12 +58,6 @@ const TopBar: React.FC<TopBarProps> = ({
     return () => clearInterval(timer);
   }, [showTimer, examStartTime, examConfig.totalTime, onSubmit]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")} min`;
-  };
-
   const handleSubmitClick = () => {
     console.log("=== SUBMIT BUTTON CLICKED ===");
     console.log("onSubmit function exists:", typeof onSubmit === "function");
@@ -80,9 +83,16 @@ const TopBar: React.FC<TopBarProps> = ({
     setShowCalculator(!showCalculator);
   };
 
+  // Use our utility functions for time display
   const displayTime = showTimer
     ? formatTime(timeRemaining)
-    : `${examConfig.duration.minutes.toString().padStart(2, "0")}:${examConfig.duration.seconds.toString().padStart(2, "0")} min`;
+    : formatTime(examConfig.totalTime);
+
+  const timeDisplayColor = getTimeDisplayColor(timeRemaining, showTimer);
+  const timeDisplayBackground = getTimeDisplayBackground(
+    timeRemaining,
+    showTimer
+  );
 
   // Check if calculator should be shown (only in exam modes, not NEWS mode)
   const shouldShowCalculator = examConfig.mode !== "NEWS";
@@ -138,20 +148,10 @@ const TopBar: React.FC<TopBarProps> = ({
 
         {/* Timer */}
         <View
-          className={`flex-row items-center px-3 py-2 rounded ${
-            showTimer && timeRemaining < 300 ? "bg-red-100" : "bg-white"
-          }`}
+          className={`flex-row items-center px-3 py-2 rounded ${timeDisplayBackground}`}
         >
           <Text className="text-lg font-bold mr-2">⏰</Text>
-          <Text
-            className={`font-bold ${
-              showTimer && timeRemaining < 300
-                ? "text-red-600"
-                : "text-blue-800"
-            }`}
-          >
-            {displayTime}
-          </Text>
+          <Text className={`font-bold ${timeDisplayColor}`}>{displayTime}</Text>
         </View>
 
         {/* Submit Button */}

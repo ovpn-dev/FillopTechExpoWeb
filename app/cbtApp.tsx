@@ -1,44 +1,25 @@
-// cbtApp.tsx - Updated Main App with Authentication Integration
+// app/cbtApp.tsx - Updated Main App with extracted services
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Text, View } from "react-native";
+
+// Import components
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
-import { useAuth } from "./contexts/AuthContext";
+
+// Import screens
 import Dashboard from "./screens/Dashboard";
 import ExamScreen from "./screens/ExamScreen";
 import InstructionScreen from "./screens/InstructionScreen";
 import ResultScreen from "./screens/ResultScreen";
 
-export type ExamMode = "TIMED" | "UNTIMED" | "STUDY" | "NEWS";
-export type ExamType = "JAMB" | "WAEC" | "NECO" | "NABTEB" | "OTHER";
-export type AppScreen = "dashboard" | "instructions" | "exam" | "results";
+// Import contexts and services
+import { useAuth } from "./contexts/AuthContext";
+import { shouldUseTimer } from "./data/examTypes";
+import { ScoreCalculator } from "./utils/scoreCalculator";
 
-export interface ExamConfig {
-  mode: ExamMode;
-  examType: ExamType;
-  subjects: string[];
-  source: string;
-  duration: { minutes: number; seconds: number };
-  numberOfQuestions: number;
-  totalTime: number;
-}
-
-export interface Question {
-  id: string;
-  subject: string;
-  text: string;
-  options: string[];
-  correctAnswer: string;
-}
-
-export interface ExamResults {
-  score: number;
-  totalQuestions: number;
-  timeUsed: number;
-  subjectBreakdown: { [subject: string]: { correct: number; total: number } };
-  answers: { [questionId: string]: string };
-}
+// Import types
+import { AppScreen, ExamConfig, ExamResults } from "./types";
 
 // Main CBT App Component (wrapped with auth)
 const CBTAppContent: React.FC = () => {
@@ -67,6 +48,13 @@ const CBTAppContent: React.FC = () => {
   const handleLogout = async () => {
     await logout();
     // Reset all exam state
+    resetExamState();
+    // Navigate back to login
+    router.push("/");
+  };
+
+  // Helper function to reset all exam state
+  const resetExamState = () => {
     setCurrentScreen("dashboard");
     setExamConfig(null);
     setExamResults(null);
@@ -74,16 +62,9 @@ const CBTAppContent: React.FC = () => {
     setCurrentQuestionInSubject(0);
     setCurrentSubject("");
     setExamStartTime(null);
-    // Navigate back to login
-    router.push("/");
   };
 
-  // Helper function to check if timer should be used
-  const shouldUseTimer = (mode: ExamMode): boolean => {
-    return mode === "TIMED";
-  };
-
-  // Navigation handlers (unchanged)
+  // Navigation handlers
   const handleStartExamSetup = (config: ExamConfig) => {
     setExamConfig(config);
     setCurrentSubject(config.subjects[0]);
@@ -133,40 +114,12 @@ const CBTAppContent: React.FC = () => {
       return;
     }
 
-    let timeUsed = 0;
-    if (shouldUseTimer(examConfig.mode) && examStartTime) {
-      timeUsed = Math.floor((Date.now() - examStartTime) / 1000);
-    }
-
-    const totalQuestions = examConfig.subjects.length * 40;
-    let correctAnswers = 0;
-    const subjectBreakdown: {
-      [subject: string]: { correct: number; total: number };
-    } = {};
-
-    examConfig.subjects.forEach((subject) => {
-      subjectBreakdown[subject] = { correct: 0, total: 40 };
-    });
-
-    examConfig.subjects.forEach((subject) => {
-      for (let i = 1; i <= 40; i++) {
-        const questionId = `${subject}_q_${i}`;
-        if (userAnswers[questionId]) {
-          if (Math.random() > 0.3) {
-            correctAnswers++;
-            subjectBreakdown[subject].correct++;
-          }
-        }
-      }
-    });
-
-    const results: ExamResults = {
-      score: correctAnswers,
-      totalQuestions,
-      timeUsed,
-      subjectBreakdown,
-      answers: userAnswers,
-    };
+    // Use ScoreCalculator service to calculate results
+    const results = ScoreCalculator.calculateResults(
+      userAnswers,
+      examConfig,
+      examStartTime
+    );
 
     console.log("Final calculated results:", results);
     setExamResults(results);
@@ -174,13 +127,7 @@ const CBTAppContent: React.FC = () => {
   };
 
   const handleReturnToDashboard = () => {
-    setCurrentScreen("dashboard");
-    setExamConfig(null);
-    setExamResults(null);
-    setUserAnswers({});
-    setCurrentQuestionInSubject(0);
-    setCurrentSubject("");
-    setExamStartTime(null);
+    resetExamState();
   };
 
   const renderMainContent = () => {

@@ -1,4 +1,4 @@
-// contexts/AuthContext.tsx
+// app/contexts/AuthContext.tsx
 import React, { createContext, ReactNode, useContext, useReducer } from "react";
 import { AuthService } from "../services/authService";
 import { AuthContextType, AuthState, User } from "../types/auth.types";

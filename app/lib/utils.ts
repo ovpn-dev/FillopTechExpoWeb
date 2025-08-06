@@ -1,23 +1,20 @@
-// lib/utils.ts - Utility functions for FILLOP CBT GURU
+// app/lib/utils.ts - Utility functions for FILLOP CBT GURU
 
 /**
  * Utility function to merge CSS classes
  * Simple alternative to clsx library
  */
 export function cn(...inputs: (string | undefined | null | boolean)[]): string {
-  return inputs
-    .filter(Boolean)
-    .join(' ')
-    .trim();
+  return inputs.filter(Boolean).join(" ").trim();
 }
 
 /**
  * Format currency in Nigerian Naira
  */
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
     minimumFractionDigits: 0,
   }).format(amount);
 }
@@ -26,11 +23,11 @@ export function formatCurrency(amount: number): string {
  * Format date to Nigerian format
  */
 export function formatDate(date: Date | string): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return dateObj.toLocaleDateString('en-NG', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+  const dateObj = typeof date === "string" ? new Date(date) : date;
+  return dateObj.toLocaleDateString("en-NG", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 }
 
@@ -48,7 +45,7 @@ export function getTimeDifference(startTime: Date, endTime: Date): number {
 export function formatDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  
+
   if (hours > 0) {
     return `${hours}h ${mins}m`;
   }
@@ -67,12 +64,12 @@ export function calculatePercentage(correct: number, total: number): number {
  * Get grade based on percentage
  */
 export function getGrade(percentage: number): { grade: string; color: string } {
-  if (percentage >= 90) return { grade: 'A+', color: 'text-green-600' };
-  if (percentage >= 80) return { grade: 'A', color: 'text-green-500' };
-  if (percentage >= 70) return { grade: 'B', color: 'text-blue-500' };
-  if (percentage >= 60) return { grade: 'C', color: 'text-yellow-500' };
-  if (percentage >= 50) return { grade: 'D', color: 'text-orange-500' };
-  return { grade: 'F', color: 'text-red-500' };
+  if (percentage >= 90) return { grade: "A+", color: "text-green-600" };
+  if (percentage >= 80) return { grade: "A", color: "text-green-500" };
+  if (percentage >= 70) return { grade: "B", color: "text-blue-500" };
+  if (percentage >= 60) return { grade: "C", color: "text-yellow-500" };
+  if (percentage >= 50) return { grade: "D", color: "text-orange-500" };
+  return { grade: "F", color: "text-red-500" };
 }
 
 /**
@@ -88,15 +85,15 @@ export function isValidEmail(email: string): boolean {
  */
 export function isValidNigerianPhone(phone: string): boolean {
   const phoneRegex = /^(\+234|234|0)([789][01]|[789]\d)\d{8}$/;
-  return phoneRegex.test(phone.replace(/\s+/g, ''));
+  return phoneRegex.test(phone.replace(/\s+/g, ""));
 }
 
 /**
  * Generate random activation code
  */
 export function generateActivationCode(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let result = "";
   for (let i = 0; i < 12; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
@@ -120,10 +117,10 @@ export function shuffleArray<T>(array: T[]): T[] {
  */
 export function getExamDuration(examType: string): number {
   const durations: Record<string, number> = {
-    'JAMB UTME': 180, // 3 hours
-    'WAEC': 120,     // 2 hours
-    'NECO': 120,     // 2 hours
-    'NABTEB': 120,   // 2 hours
+    "JAMB UTME": 180, // 3 hours
+    WAEC: 120, // 2 hours
+    NECO: 120, // 2 hours
+    NABTEB: 120, // 2 hours
   };
   return durations[examType] || 120;
 }
@@ -133,18 +130,18 @@ export function getExamDuration(examType: string): number {
  */
 export function getSubjectColor(subject: string): string {
   const colors: Record<string, string> = {
-    'Mathematics': 'bg-blue-100 text-blue-800',
-    'English Language': 'bg-green-100 text-green-800',
-    'Physics': 'bg-purple-100 text-purple-800',
-    'Chemistry': 'bg-red-100 text-red-800',
-    'Biology': 'bg-yellow-100 text-yellow-800',
-    'Geography': 'bg-indigo-100 text-indigo-800',
-    'Government': 'bg-pink-100 text-pink-800',
-    'Economics': 'bg-orange-100 text-orange-800',
-    'History': 'bg-gray-100 text-gray-800',
-    'Literature in English': 'bg-teal-100 text-teal-800',
+    Mathematics: "bg-blue-100 text-blue-800",
+    "English Language": "bg-green-100 text-green-800",
+    Physics: "bg-purple-100 text-purple-800",
+    Chemistry: "bg-red-100 text-red-800",
+    Biology: "bg-yellow-100 text-yellow-800",
+    Geography: "bg-indigo-100 text-indigo-800",
+    Government: "bg-pink-100 text-pink-800",
+    Economics: "bg-orange-100 text-orange-800",
+    History: "bg-gray-100 text-gray-800",
+    "Literature in English": "bg-teal-100 text-teal-800",
   };
-  return colors[subject] || 'bg-gray-100 text-gray-800';
+  return colors[subject] || "bg-gray-100 text-gray-800";
 }
 
 /**
@@ -161,49 +158,54 @@ export function getDaysUntilExam(examDate: string): number {
  * Generate performance insights
  */
 export function generatePerformanceInsights(scores: number[]): {
-  trend: 'improving' | 'declining' | 'stable';
+  trend: "improving" | "declining" | "stable";
   average: number;
   highest: number;
   lowest: number;
-  consistency: 'high' | 'medium' | 'low';
+  consistency: "high" | "medium" | "low";
 } {
   if (scores.length === 0) {
     return {
-      trend: 'stable',
+      trend: "stable",
       average: 0,
       highest: 0,
       lowest: 0,
-      consistency: 'low'
+      consistency: "low",
     };
   }
 
   const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
   const highest = Math.max(...scores);
   const lowest = Math.min(...scores);
-  
+
   // Calculate trend (comparing first half vs second half)
   const midPoint = Math.floor(scores.length / 2);
-  const firstHalfAvg = scores.slice(0, midPoint).reduce((sum, score) => sum + score, 0) / midPoint;
-  const secondHalfAvg = scores.slice(midPoint).reduce((sum, score) => sum + score, 0) / (scores.length - midPoint);
-  
-  let trend: 'improving' | 'declining' | 'stable' = 'stable';
-  if (secondHalfAvg > firstHalfAvg + 5) trend = 'improving';
-  else if (secondHalfAvg < firstHalfAvg - 5) trend = 'declining';
-  
+  const firstHalfAvg =
+    scores.slice(0, midPoint).reduce((sum, score) => sum + score, 0) / midPoint;
+  const secondHalfAvg =
+    scores.slice(midPoint).reduce((sum, score) => sum + score, 0) /
+    (scores.length - midPoint);
+
+  let trend: "improving" | "declining" | "stable" = "stable";
+  if (secondHalfAvg > firstHalfAvg + 5) trend = "improving";
+  else if (secondHalfAvg < firstHalfAvg - 5) trend = "declining";
+
   // Calculate consistency based on standard deviation
-  const variance = scores.reduce((sum, score) => sum + Math.pow(score - average, 2), 0) / scores.length;
+  const variance =
+    scores.reduce((sum, score) => sum + Math.pow(score - average, 2), 0) /
+    scores.length;
   const standardDeviation = Math.sqrt(variance);
-  
-  let consistency: 'high' | 'medium' | 'low' = 'medium';
-  if (standardDeviation < 10) consistency = 'high';
-  else if (standardDeviation > 20) consistency = 'low';
-  
+
+  let consistency: "high" | "medium" | "low" = "medium";
+  if (standardDeviation < 10) consistency = "high";
+  else if (standardDeviation > 20) consistency = "low";
+
   return {
     trend,
     average: Math.round(average),
     highest,
     lowest,
-    consistency
+    consistency,
   };
 }
 
@@ -214,11 +216,11 @@ export function formatTimeRemaining(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
-  
+
   if (hours > 0) {
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }
-  return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  return `${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
 /**
@@ -227,9 +229,11 @@ export function formatTimeRemaining(seconds: number): string {
 export function getMotivationalMessage(score: number): string {
   if (score >= 90) return "Outstanding performance! You're exam-ready! 🌟";
   if (score >= 80) return "Excellent work! Keep up the momentum! 🚀";
-  if (score >= 70) return "Good job! A little more practice and you'll excel! 💪";
+  if (score >= 70)
+    return "Good job! A little more practice and you'll excel! 💪";
   if (score >= 60) return "You're getting there! Focus on your weak areas! 📚";
-  if (score >= 50) return "Don't give up! More practice will improve your score! 💪";
+  if (score >= 50)
+    return "Don't give up! More practice will improve your score! 💪";
   return "Keep practicing! Every question brings you closer to success! 🎯";
 }
 
@@ -241,46 +245,46 @@ export const storage = {
     try {
       // In React Native, you would use AsyncStorage
       // For web, using localStorage
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         localStorage.setItem(key, JSON.stringify(value));
       }
     } catch (error) {
-      console.error('Storage set error:', error);
+      console.error("Storage set error:", error);
     }
   },
 
   get: async (key: string): Promise<any> => {
     try {
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         const item = localStorage.getItem(key);
         return item ? JSON.parse(item) : null;
       }
       return null;
     } catch (error) {
-      console.error('Storage get error:', error);
+      console.error("Storage get error:", error);
       return null;
     }
   },
 
   remove: async (key: string): Promise<void> => {
     try {
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         localStorage.removeItem(key);
       }
     } catch (error) {
-      console.error('Storage remove error:', error);
+      console.error("Storage remove error:", error);
     }
   },
 
   clear: async (): Promise<void> => {
     try {
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         localStorage.clear();
       }
     } catch (error) {
-      console.error('Storage clear error:', error);
+      console.error("Storage clear error:", error);
     }
-  }
+  },
 };
 
 /**
@@ -288,7 +292,7 @@ export const storage = {
  */
 export const network = {
   isOnline: (): boolean => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       return navigator.onLine;
     }
     return true; // Assume online in server environment
@@ -296,15 +300,15 @@ export const network = {
 
   checkConnection: async (): Promise<boolean> => {
     try {
-      const response = await fetch('/api/health', {
-        method: 'HEAD',
-        cache: 'no-cache'
+      const response = await fetch("/api/health", {
+        method: "HEAD",
+        cache: "no-cache",
       });
       return response.ok;
     } catch {
       return false;
     }
-  }
+  },
 };
 
 /**
@@ -313,14 +317,14 @@ export const network = {
 export function analyzeQuestionDifficulty(
   correctAnswers: number,
   totalAttempts: number
-): 'Easy' | 'Medium' | 'Hard' {
-  if (totalAttempts === 0) return 'Medium';
-  
+): "Easy" | "Medium" | "Hard" {
+  if (totalAttempts === 0) return "Medium";
+
   const successRate = correctAnswers / totalAttempts;
-  
-  if (successRate >= 0.8) return 'Easy';
-  if (successRate >= 0.5) return 'Medium';
-  return 'Hard';
+
+  if (successRate >= 0.8) return "Easy";
+  if (successRate >= 0.5) return "Medium";
+  return "Hard";
 }
 
 /**
@@ -328,39 +332,49 @@ export function analyzeQuestionDifficulty(
  */
 export function generateStudyRecommendations(
   subjectScores: Record<string, number[]>
-): Array<{ subject: string; priority: 'High' | 'Medium' | 'Low'; message: string }> {
-  const recommendations: Array<{ subject: string; priority: 'High' | 'Medium' | 'Low'; message: string }> = [];
-  
+): Array<{
+  subject: string;
+  priority: "High" | "Medium" | "Low";
+  message: string;
+}> {
+  const recommendations: Array<{
+    subject: string;
+    priority: "High" | "Medium" | "Low";
+    message: string;
+  }> = [];
+
   Object.entries(subjectScores).forEach(([subject, scores]) => {
     if (scores.length === 0) return;
-    
-    const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+
+    const average =
+      scores.reduce((sum, score) => sum + score, 0) / scores.length;
     const insights = generatePerformanceInsights(scores);
-    
-    let priority: 'High' | 'Medium' | 'Low' = 'Medium';
-    let message = '';
-    
+
+    let priority: "High" | "Medium" | "Low" = "Medium";
+    let message = "";
+
     if (average < 50) {
-      priority = 'High';
+      priority = "High";
       message = `Critical attention needed. Focus on fundamentals and practice more questions.`;
     } else if (average < 70) {
-      priority = 'Medium';
+      priority = "Medium";
       message = `Good progress. Work on specific topics where you're struggling.`;
     } else {
-      priority = 'Low';
+      priority = "Low";
       message = `Excellent performance. Maintain with regular practice.`;
     }
-    
-    if (insights.trend === 'declining') {
-      priority = priority === 'Low' ? 'Medium' : 'High';
-      message += ' Note: Performance is declining, consider reviewing recent topics.';
+
+    if (insights.trend === "declining") {
+      priority = priority === "Low" ? "Medium" : "High";
+      message +=
+        " Note: Performance is declining, consider reviewing recent topics.";
     }
-    
+
     recommendations.push({ subject, priority, message });
   });
-  
+
   return recommendations.sort((a, b) => {
-    const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+    const priorityOrder = { High: 3, Medium: 2, Low: 1 };
     return priorityOrder[b.priority] - priorityOrder[a.priority];
   });
 }

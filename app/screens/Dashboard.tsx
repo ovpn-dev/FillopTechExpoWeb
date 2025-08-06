@@ -1,4 +1,4 @@
-// screens/Dashboard.tsx - Refactored to use reusable Dropdown component
+// screens/Dashboard.tsx - Refactored to use extracted constants and services
 import React, { useState } from "react";
 import {
   Alert,
@@ -8,70 +8,28 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ExamConfig, ExamMode, ExamType } from "../cbtApp";
+
+// Import our new constants and services
+import {
+  EXAM_MODES,
+  EXAM_TYPES,
+  ExamMode,
+  ExamType,
+  getExamTypeConfig,
+  QUESTION_SOURCES,
+  shouldUseTimer,
+} from "../data/examTypes";
+import { ALL_SUBJECTS } from "../data/subjects";
+import { ExamConfig, ExamValidator } from "../utils/examValidator";
+import { formatTwoDigits } from "../utils/timeFormatter";
+
+// Import existing components
 import Button from "../components/Button";
-import Dropdown from "../components/Dropdown"; // Import the reusable component
+import Dropdown from "../components/Dropdown";
 
 interface DashboardProps {
   onStartExam: (config: ExamConfig) => void;
 }
-
-const allSubjects = [
-  "AGRICULTURAL SCIENCE",
-  "ENGLISH LANGUAGE",
-  "BIOLOGY",
-  "CHEMISTRY",
-  "LIT. IN ENGLISH",
-  "MATHEMATICS",
-  "PHYSICS",
-  "FRENCH",
-  "FURTHER MATHEMATICS",
-  "CIVIC EDUCATION",
-  "FINANCIAL ACCOUNTING",
-  "BIBLE KNOWLEDGE",
-  "COMMERCE",
-  "COMPUTER STUDIES",
-  "BASIC WORKSHOP",
-  "GEOGRAPHY",
-  "ECONOMICS",
-];
-
-const questionSources = {
-  JAMB: [
-    "Random Questions",
-    "2025 JAMB Questions",
-    "2024 JAMB Questions",
-    "2023 JAMB Questions",
-    "2022 JAMB Questions",
-    "2021 JAMB Questions",
-    "2020 JAMB Questions",
-    "2019 JAMB Questions",
-  ],
-  WAEC: [
-    "Random Questions",
-    "2025 WAEC Questions",
-    "2024 WAEC Questions",
-    "2023 WAEC Questions",
-    "2022 WAEC Questions",
-    "2021 WAEC Questions",
-    "2020 WAEC Questions",
-    "2019 WAEC Questions",
-  ],
-  NECO: [
-    "Random Questions",
-    "2024 NECO Questions",
-    "2023 NECO Questions",
-    "2022 NECO Questions",
-    "2021 NECO Questions",
-  ],
-  NABTEB: [
-    "Random Questions",
-    "2024 NABTEB Questions",
-    "2023 NABTEB Questions",
-    "2022 NABTEB Questions",
-  ],
-  OTHER: ["Random Questions", "Custom Questions", "Practice Bank"],
-};
 
 const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
   const [mode, setMode] = useState<ExamMode | null>(null);
@@ -80,54 +38,41 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
   const [source, setSource] = useState<string>("");
   const [minutes, setMinutes] = useState(0);
   const [seconds, setSeconds] = useState(0);
-  const [numberOfQuestions, setNumberOfQuestions] = useState(20);
-
-  const shouldShowTimer = (mode: ExamMode | null): boolean => {
-    return mode === "TIMED";
-  };
 
   const handleSubmit = () => {
-    const isTimerRequired = shouldShowTimer(mode);
-    const hasValidTimer = minutes > 0 || seconds > 0;
-
-    if (!mode || !examType || subjects.length === 0 || !source) {
-      Alert.alert("Incomplete Form", "Please fill all required fields.");
-      return;
-    }
-
-    if (isTimerRequired && !hasValidTimer) {
-      Alert.alert("Timer Required", "Please set a duration for timed exams.");
-      return;
-    }
-
-    const examConfig: ExamConfig = {
-      mode,
-      examType,
+    const examConfig: Partial<ExamConfig> = {
+      mode: mode ?? undefined,
+      examType: examType ?? undefined,
       subjects,
       source,
-      duration: {
-        minutes: isTimerRequired ? minutes : 0,
-        seconds: isTimerRequired ? seconds : 0,
-      },
+      duration: { minutes, seconds },
       numberOfQuestions: examType === "JAMB" ? 60 : 40,
-      totalTime: isTimerRequired ? minutes * 60 + seconds : 0,
+      totalTime: mode && shouldUseTimer(mode) ? minutes * 60 + seconds : 0,
     };
 
-    onStartExam(examConfig);
+    const validation = ExamValidator.validateExamConfig(examConfig);
+
+    if (!validation.isValid) {
+      Alert.alert("Incomplete Form", validation.errors.join("\n"));
+      return;
+    }
+
+    onStartExam(examConfig as ExamConfig);
   };
 
   const toggleSubject = (subject: string) => {
-    const maxSubjects = examType === "JAMB" ? 4 : 9;
+    if (!examType) return;
 
     if (subjects.includes(subject)) {
       setSubjects((prev) => prev.filter((s) => s !== subject));
     } else {
-      if (subjects.length >= maxSubjects) {
-        Alert.alert(
-          "Subject Limit",
-          `You can only select maximum ${maxSubjects} subjects for ${examType}`,
-          [{ text: "OK" }]
-        );
+      const validation = ExamValidator.canAddSubject(
+        subjects,
+        examType,
+        subject
+      );
+      if (!validation.isValid) {
+        Alert.alert("Subject Limit", validation.errors[0], [{ text: "OK" }]);
         return;
       }
       setSubjects((prev) => [...prev, subject]);
@@ -167,31 +112,20 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
     setSource(""); // Reset source when exam type changes
     setSubjects([]);
 
-    if (shouldShowTimer(mode)) {
-      if (type === "JAMB") {
-        setMinutes(180);
-        setSeconds(0);
-        setNumberOfQuestions(60);
-      } else if (["WAEC", "NECO", "NABTEB"].includes(type)) {
-        setMinutes(120);
-        setSeconds(0);
-        setNumberOfQuestions(40);
-      } else {
-        setMinutes(60);
-        setSeconds(0);
-        setNumberOfQuestions(20);
-      }
+    const typeConfig = getExamTypeConfig(type);
+    if (mode && shouldUseTimer(mode) && typeConfig) {
+      setMinutes(typeConfig.defaultDuration.minutes);
+      setSeconds(typeConfig.defaultDuration.seconds);
     } else {
       setMinutes(0);
       setSeconds(0);
-      setNumberOfQuestions(type === "JAMB" ? 60 : 40);
     }
   };
 
   const handleModeChange = (selectedMode: ExamMode) => {
     setMode(selectedMode);
 
-    if (!shouldShowTimer(selectedMode)) {
+    if (!shouldUseTimer(selectedMode)) {
       setMinutes(0);
       setSeconds(0);
     } else if (examType) {
@@ -200,46 +134,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
   };
 
   // Get available sources based on selected exam type
-  const availableSources = examType ? questionSources[examType] : [];
+  const availableSources = examType ? QUESTION_SOURCES[examType] : [];
 
   const isFormComplete = () => {
-    const basicRequirements = mode && examType && subjects.length > 0 && source;
-    const timerRequirement = shouldShowTimer(mode)
-      ? minutes > 0 || seconds > 0
-      : true;
-    return basicRequirements && timerRequirement;
-  };
-
-  const formatTime = (value: number) => value.toString().padStart(2, "0");
-
-  const getSubjectValidationMessage = () => {
-    if (!examType) return "";
-    const maxSubjects = examType === "JAMB" ? 4 : 9;
-    if (examType === "JAMB" && subjects.length > 0 && subjects.length < 4) {
-      return `JAMB requires exactly 4 subjects. Selected: ${subjects.length}/4`;
-    }
-    return `Selected: ${subjects.length}/${maxSubjects} subjects`;
-  };
-
-  const getModeDescription = (modeKey: ExamMode) => {
-    switch (modeKey) {
-      case "TIMED":
-        return "Complete exam within set time limit";
-      case "UNTIMED":
-        return "Take as much time as needed";
-      case "STUDY":
-        return "Practice with instant feedback";
-      case "NEWS":
-        return "Latest updates and announcements";
-      default:
-        return "";
-    }
+    const config: Partial<ExamConfig> = {
+      mode: mode ?? undefined,
+      examType: examType ?? undefined,
+      subjects,
+      source,
+      duration: { minutes, seconds },
+    };
+    return ExamValidator.isFormComplete(config);
   };
 
   return (
     <ScrollView className="flex-1 p-6">
       <Text className="text-4xl text-center font-bold mb-2 text-green-800">
-        WELCOME TO CBT!
+        WELCOME TO FILLOP TECH CBT!
       </Text>
       <Text className="text-center text-gray-600 mb-8">
         Select your examination preferences
@@ -248,15 +159,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
       {/* Mode Selection */}
       <Text className="text-red-600 mb-3 font-bold text-lg">CHOOSE MODE:</Text>
       <View className="flex-row gap-2 mb-8 flex-wrap">
-        {[
-          { key: "TIMED", label: "TIMED EXAMS", color: "bg-gray-700" },
-          { key: "UNTIMED", label: "UNTIMED EXAMS", color: "bg-blue-600" },
-          { key: "STUDY", label: "STUDY MODE", color: "bg-green-600" },
-          { key: "NEWS", label: "NEWS & UPDATES", color: "bg-purple-600" },
-        ].map((m) => (
+        {EXAM_MODES.map((m) => (
           <TouchableOpacity
             key={m.key}
-            onPress={() => handleModeChange(m.key as ExamMode)}
+            onPress={() => handleModeChange(m.key)}
             className={`px-4 py-3 rounded-lg shadow-sm ${
               mode === m.key ? m.color : "bg-gray-400"
             }`}
@@ -265,7 +171,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
               {m.label}
             </Text>
             <Text className="text-white text-xs text-center mt-1">
-              {getModeDescription(m.key as ExamMode)}
+              {m.description}
             </Text>
           </TouchableOpacity>
         ))}
@@ -276,16 +182,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
         SELECT EXAMINATION TYPE:
       </Text>
       <View className="flex-row gap-8 mb-8 flex-wrap">
-        {[
-          { key: "JAMB", label: "JAMB UTME", desc: "4 subjects, 3 hours" },
-          { key: "WAEC", label: "WAEC", desc: "Up to 9 subjects" },
-          { key: "NECO", label: "NECO", desc: "Up to 9 subjects" },
-          { key: "OTHER", label: "CUSTOM", desc: "Practice mode" },
-        ].map((type) => (
+        {EXAM_TYPES.map((type) => (
           <TouchableOpacity
             key={type.key}
             className="flex-row items-center gap-3 mb-2"
-            onPress={() => handleExamTypeChange(type.key as ExamType)}
+            onPress={() => handleExamTypeChange(type.key)}
           >
             <View
               className={`w-6 h-6 rounded-full border-2 border-black items-center justify-center ${
@@ -298,7 +199,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
             </View>
             <View>
               <Text className="text-lg font-semibold">{type.label}</Text>
-              <Text className="text-sm text-gray-600">{type.desc}</Text>
+              <Text className="text-sm text-gray-600">{type.description}</Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -310,11 +211,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
           <Text className="font-bold mb-2 text-lg">CHOOSE SUBJECT(S)</Text>
           {examType && (
             <Text className="text-sm text-blue-600 mb-3">
-              {getSubjectValidationMessage()}
+              {ExamValidator.getSubjectValidationMessage(subjects, examType)}
             </Text>
           )}
           <View className="flex-row flex-wrap gap-3">
-            {allSubjects.map((subj) => {
+            {ALL_SUBJECTS.map((subj) => {
               const isSelected = subjects.includes(subj);
               return (
                 <View
@@ -341,7 +242,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
         {/* Question Source and Timer - Side by Side */}
         <View className="mb-8 w-[30%]">
           <View className="flex-column justify-between items-center">
-            {/* Source - Using Reusable Dropdown Component */}
+            {/* Source */}
             <View className="flex-1" style={{ zIndex: 999 }}>
               <Dropdown
                 label="SOURCE OF QUESTIONS"
@@ -350,7 +251,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
                     ? "Select exam type first"
                     : "Select question source"
                 }
-                options={availableSources}
+                options={[...availableSources]}
                 selectedValue={source}
                 onSelect={setSource}
                 disabled={!examType}
@@ -360,8 +261,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
               />
             </View>
 
-            {/* Timer - Right Side - Only show for TIMED mode */}
-            {shouldShowTimer(mode) && (
+            {/* Timer - Only show for TIMED mode */}
+            {mode && shouldUseTimer(mode) && (
               <View className="flex-1 items-center">
                 <Text className="font-bold mb-2 text-lg">EXAM DURATION</Text>
                 <View className="border-2 border-black bg-white rounded-lg shadow-sm p-3">
@@ -426,7 +327,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
                   {/* Total */}
                   <View className="border-t border-gray-200 pt-2">
                     <Text className="text-xs text-gray-600 text-center">
-                      Total: {minutes}:{formatTime(seconds)}
+                      Total: {minutes}:{formatTwoDigits(seconds)}
                     </Text>
                   </View>
                 </View>
@@ -434,7 +335,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
             )}
 
             {/* Mode Info for non-timed modes */}
-            {!shouldShowTimer(mode) && mode && (
+            {mode && !shouldUseTimer(mode) && (
               <View className="flex-1">
                 <Text className="font-bold mb-2 text-lg">MODE INFO</Text>
                 <View className="border-2 border-blue-600 bg-blue-50 rounded-lg shadow-sm p-4">
@@ -442,7 +343,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
                     {mode.toUpperCase()} MODE
                   </Text>
                   <Text className="text-blue-700 text-sm text-center">
-                    {getModeDescription(mode)}
+                    {EXAM_MODES.find((m) => m.key === mode)?.description}
                   </Text>
                   {mode === "UNTIMED" && (
                     <Text className="text-blue-600 text-xs text-center mt-2">
@@ -483,9 +384,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
             Subjects: {subjects.join(", ")}
           </Text>
           <Text className="text-green-700">Source: {source}</Text>
-          {shouldShowTimer(mode) ? (
+          {mode && shouldUseTimer(mode) ? (
             <Text className="text-green-700">
-              Duration: {minutes}:{formatTime(seconds)}
+              Duration: {minutes}:{formatTwoDigits(seconds)}
             </Text>
           ) : (
             <Text className="text-blue-700">Duration: No time limit</Text>

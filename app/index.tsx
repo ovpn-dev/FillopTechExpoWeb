@@ -1,4 +1,4 @@
-// index.tsx - Updated Login Screen with Authentication
+// app/index.tsx - Updated Login Screen with Authentication
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Alert, Text, TextInput, TouchableOpacity, View } from "react-native";

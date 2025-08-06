@@ -1,3 +1,4 @@
+// app/register/corporate.tsx
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -36,7 +37,7 @@ const INSTITUTION_TYPES = [
   "Training Institute",
   "Other",
 ];
-const EXAM_TYPES = ["JAMB UTME", "WAEC", "NECO", "NABTEB", "All Exams"];
+const EXAM_TYPES = ["JAMB UTME", "WAEC", "NECO", "All Exams"];
 
 export default function CorporateRegistration() {
   const router = useRouter();

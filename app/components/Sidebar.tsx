@@ -48,23 +48,23 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
 
   return (
     <>
-      <View className="bg-blue-400 p-6 shadow-lg">
-        <View className="bg-white rounded-xl p-6 items-center shadow-md">
+      <View className="bg-blue-400 p-5 shadow-lg">
+        <View className="bg-white rounded-xl p-5 items-center shadow-md">
           <View className="bg-blue-600 rounded-full p-4 mb-4 shadow-sm">
             <Image
               source={{ uri: user.profileImage }}
               className="w-16 h-16 rounded-full"
             />
           </View>
-          <Text className="text-xl font-bold mb-4 text-blue-800">
+          <Text className="text-lg font-bold mb-4 text-blue-800">
             Your Profile
           </Text>
 
           {/* User Profile Section */}
-          <View className="bg-gray-50 rounded-lg p-4 w-full items-center mb-4 border border-gray-200">
+          <View className="bg-gray-50 rounded-lg p-4 w-full items-center mb-2 border border-gray-200">
             <Image
               source={{ uri: user.profileImage }}
-              className="w-32 h-32 rounded-lg mb-4 border-2 border-blue-200"
+              className="w-16 h-16 rounded-lg mb-2 border-2 border-blue-200"
             />
             <Text className="text-3xl font-bold text-gray-800">
               {user.firstName}
@@ -103,10 +103,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
           {/* Logout Button */}
           <TouchableOpacity
             onPress={handleLogoutPress}
-            className="w-full bg-red-600 py-3 px-4 rounded-lg mb-4 shadow-sm"
+            className="w-full bg-red-600 py-3 px-3 rounded-lg shadow-sm"
           >
             <Text className="text-white font-bold text-center text-lg">
-              🚪 LOGOUT
+              LOGOUT
             </Text>
           </TouchableOpacity>
 

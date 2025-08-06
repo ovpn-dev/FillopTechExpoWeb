@@ -1,7 +1,10 @@
-// screens/ExamScreen.tsx
+// app/screens/ExamScreen.tsx - Refactored to use QuestionService
 import React from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { ExamConfig, Question } from "../cbtApp";
+
+// Import our new services and types
+import { QuestionService } from "../services/questionService";
+import { ExamConfig } from "../utils/examValidator";
 
 interface ExamScreenProps {
   examConfig: ExamConfig;
@@ -24,24 +27,21 @@ export default function ExamScreen({
   onAnswerChange,
   examStartTime,
 }: ExamScreenProps) {
-  // Generate 40 questions per subject
-  const generateQuestionsForSubject = (subject: string): Question[] => {
-    return Array.from({ length: 40 }, (_, i) => ({
-      id: `${subject}_q_${i + 1}`,
-      subject: subject,
-      text: `${subject} - Sample question ${i + 1}. This is a sample question for demonstration purposes.`,
-      options: [
-        `${subject} Option A for question ${i + 1}`,
-        `${subject} Option B for question ${i + 1}`,
-        `${subject} Option C for question ${i + 1}`,
-        `${subject} Option D for question ${i + 1}`,
-      ],
-      correctAnswer: "A", // Mock correct answer
-    }));
-  };
+  // Use QuestionService to generate questions
+  const currentSubjectQuestions = QuestionService.generateQuestionsForSubject(
+    currentSubject,
+    examConfig.numberOfQuestions || 40
+  );
 
-  const currentSubjectQuestions = generateQuestionsForSubject(currentSubject);
   const currentQuestion = currentSubjectQuestions[currentQuestionInSubject];
+
+  // Get navigation info using QuestionService
+  const navigationInfo = QuestionService.getQuestionNavigation(
+    examConfig.subjects,
+    currentSubject,
+    currentQuestionInSubject,
+    examConfig.numberOfQuestions || 40
+  );
 
   const handleAnswerSelect = (answer: string) => {
     const newAnswers = { ...userAnswers, [currentQuestion.id]: answer };
@@ -49,8 +49,9 @@ export default function ExamScreen({
   };
 
   const goToNext = () => {
-    // Save current answer automatically when moving to next
-    if (currentQuestionInSubject < 39) {
+    const questionsPerSubject = examConfig.numberOfQuestions || 40;
+
+    if (currentQuestionInSubject < questionsPerSubject - 1) {
       // Move to next question in current subject
       onQuestionChange(currentQuestionInSubject + 1);
     } else {
@@ -65,6 +66,8 @@ export default function ExamScreen({
   };
 
   const goToPrevious = () => {
+    const questionsPerSubject = examConfig.numberOfQuestions || 40;
+
     if (currentQuestionInSubject > 0) {
       // Move to previous question in current subject
       onQuestionChange(currentQuestionInSubject - 1);
@@ -74,7 +77,7 @@ export default function ExamScreen({
       if (currentSubjectIndex > 0) {
         const previousSubject = examConfig.subjects[currentSubjectIndex - 1];
         onSubjectChange(previousSubject);
-        onQuestionChange(39); // Go to last question of previous subject
+        onQuestionChange(questionsPerSubject - 1); // Go to last question of previous subject
       }
     }
   };
@@ -89,17 +92,16 @@ export default function ExamScreen({
   };
 
   const getAnsweredQuestionsInSubject = (subject: string) => {
-    const subjectQuestions = generateQuestionsForSubject(subject);
-    return subjectQuestions.filter((q) => userAnswers[q.id]).length;
+    const allQuestions = QuestionService.generateQuestionsForSubject(
+      subject,
+      examConfig.numberOfQuestions || 40
+    );
+    return QuestionService.getAnsweredQuestionsInSubject(
+      allQuestions,
+      subject,
+      userAnswers
+    );
   };
-
-  const isFirstQuestion =
-    currentQuestionInSubject === 0 &&
-    examConfig.subjects.indexOf(currentSubject) === 0;
-  const isLastQuestion =
-    currentQuestionInSubject === 39 &&
-    examConfig.subjects.indexOf(currentSubject) ===
-      examConfig.subjects.length - 1;
 
   return (
     <ScrollView>
@@ -115,6 +117,7 @@ export default function ExamScreen({
           {examConfig.subjects.map((subject) => {
             const isActive = subject === currentSubject;
             const answeredCount = getAnsweredQuestionsInSubject(subject);
+            const totalQuestions = examConfig.numberOfQuestions || 40;
 
             return (
               <TouchableOpacity
@@ -130,7 +133,7 @@ export default function ExamScreen({
                     : subject}
                 </Text>
                 <Text className="text-white text-xs text-center">
-                  {answeredCount}/40
+                  {answeredCount}/{totalQuestions}
                 </Text>
               </TouchableOpacity>
             );
@@ -143,7 +146,8 @@ export default function ExamScreen({
             {currentSubject}
           </Text>
           <Text className="text-lg">
-            Question {currentQuestionInSubject + 1} of 40
+            Question {navigationInfo.currentQuestionNumber} of{" "}
+            {navigationInfo.totalQuestionsInSubject}
           </Text>
         </View>
 
@@ -254,8 +258,8 @@ export default function ExamScreen({
           </View>
 
           <Text className="text-sm text-gray-600 mt-2">
-            Answered {getAnsweredQuestionsInSubject(currentSubject)} of 40 in
-            this subject
+            Answered {getAnsweredQuestionsInSubject(currentSubject)} of{" "}
+            {examConfig.numberOfQuestions || 40} in this subject
           </Text>
         </View>
 
@@ -270,14 +274,14 @@ export default function ExamScreen({
         >
           <TouchableOpacity
             onPress={goToPrevious}
-            disabled={isFirstQuestion}
+            disabled={navigationInfo.isFirstQuestion}
             className={`px-6 py-3 rounded-lg ${
-              isFirstQuestion ? "bg-gray-300" : "bg-blue-600"
+              navigationInfo.isFirstQuestion ? "bg-gray-300" : "bg-blue-600"
             }`}
           >
             <Text
               className={`font-bold ${
-                isFirstQuestion ? "text-gray-500" : "text-white"
+                navigationInfo.isFirstQuestion ? "text-gray-500" : "text-white"
               }`}
             >
               PREVIOUS
@@ -286,14 +290,14 @@ export default function ExamScreen({
 
           <TouchableOpacity
             onPress={goToNext}
-            disabled={isLastQuestion}
+            disabled={navigationInfo.isLastQuestion}
             className={`px-6 py-3 rounded-lg ${
-              isLastQuestion ? "bg-gray-300" : "bg-blue-600"
+              navigationInfo.isLastQuestion ? "bg-gray-300" : "bg-blue-600"
             }`}
           >
             <Text
               className={`font-bold ${
-                isLastQuestion ? "text-gray-500" : "text-white"
+                navigationInfo.isLastQuestion ? "text-gray-500" : "text-white"
               }`}
             >
               NEXT

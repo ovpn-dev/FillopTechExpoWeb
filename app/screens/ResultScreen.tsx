@@ -1,15 +1,14 @@
-// components/ResultScreen.tsx - Updated with mode-based time display
+// app/screens/ResultScreen.tsx - Updated with ScoreCalculator service
 import React from "react";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
+// Import our services and utilities
+import { ExamResults } from "../types";
+import { ScoreCalculator } from "../utils/scoreCalculator";
+import { formatLongTime } from "../utils/timeFormatter";
+
 interface ResultScreenProps {
-  results: {
-    score: number;
-    totalQuestions: number;
-    timeUsed: number;
-    subjectBreakdown: { [subject: string]: { correct: number; total: number } };
-    examMode?: string; // Add examMode to know if it was timed
-  };
+  results: ExamResults;
   onRetakeExam: () => void;
   onReturnToDashboard: () => void;
 }
@@ -19,52 +18,18 @@ const ResultScreen: React.FC<ResultScreenProps> = ({
   onRetakeExam,
   onReturnToDashboard,
 }) => {
-  const percentage = Math.round((results.score / results.totalQuestions) * 100);
-  const isTimedExam = results.timeUsed > 0; // If timeUsed is 0, it wasn't a timed exam
-
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${secs}s`;
-    }
-    return `${minutes}m ${secs}s`;
-  };
-
-  const getPerformanceMessage = () => {
-    if (percentage >= 70) {
-      return {
-        message: "EXCELLENT PERFORMANCE!",
-        description:
-          "Outstanding work! You've demonstrated strong mastery of the subjects.",
-        color: "text-green-800",
-        bgColor: "bg-green-100",
-      };
-    } else if (percentage >= 50) {
-      return {
-        message: "GOOD PERFORMANCE!",
-        description:
-          "Well done! With some more practice, you can achieve excellence.",
-        color: "text-yellow-800",
-        bgColor: "bg-yellow-100",
-      };
-    } else {
-      return {
-        message: "NEEDS IMPROVEMENT",
-        description: "Keep practicing! Focus on areas where you scored lower.",
-        color: "text-red-800",
-        bgColor: "bg-red-100",
-      };
-    }
-  };
-
-  const performanceInfo = getPerformanceMessage();
+  const percentage = ScoreCalculator.calculatePercentage(
+    results.score,
+    results.totalQuestions
+  );
+  const isTimedExam = results.timeUsed > 0;
+  const performanceInfo = ScoreCalculator.getPerformanceGrade(percentage);
+  const studyRecommendations = ScoreCalculator.generateStudyRecommendations(
+    results.subjectBreakdown
+  );
 
   return (
     <ScrollView>
-      {" "}
       <View className="flex-1 p-6">
         <Text className="text-3xl font-bold text-center mb-6 text-green-800">
           EXAM RESULTS
@@ -82,14 +47,14 @@ const ResultScreen: React.FC<ResultScreenProps> = ({
           {/* Time Used - Only show if it was a timed exam */}
           {isTimedExam && (
             <Text className="text-center text-gray-600 mb-4">
-              ⏰ Time Used: {formatTime(results.timeUsed)}
+              ⏰ Time Used: {formatLongTime(results.timeUsed)}
             </Text>
           )}
 
           {/* Mode indicator for non-timed exams */}
           {!isTimedExam && (
             <Text className="text-center text-blue-600 mb-4">
-              🕐 Completed in Untimed Mode
+              🕐 Completed in {results.examMode || "Untimed"} Mode
             </Text>
           )}
 
@@ -109,28 +74,10 @@ const ResultScreen: React.FC<ResultScreenProps> = ({
 
           <View className="flex-row justify-center">
             <View
-              className={`px-4 py-2 rounded-full ${
-                percentage >= 70
-                  ? "bg-green-100"
-                  : percentage >= 50
-                    ? "bg-yellow-100"
-                    : "bg-red-100"
-              }`}
+              className={`px-4 py-2 rounded-full ${performanceInfo.bgColor}`}
             >
-              <Text
-                className={`font-bold ${
-                  percentage >= 70
-                    ? "text-green-800"
-                    : percentage >= 50
-                      ? "text-yellow-800"
-                      : "text-red-800"
-                }`}
-              >
-                {percentage >= 70
-                  ? "EXCELLENT"
-                  : percentage >= 50
-                    ? "GOOD"
-                    : "NEEDS IMPROVEMENT"}
+              <Text className={`font-bold ${performanceInfo.color}`}>
+                {performanceInfo.grade}
               </Text>
             </View>
           </View>
@@ -143,9 +90,11 @@ const ResultScreen: React.FC<ResultScreenProps> = ({
           </Text>
           <ScrollView>
             {Object.entries(results.subjectBreakdown).map(([subject, data]) => {
-              const subjectPercentage = Math.round(
-                (data.correct / data.total) * 100
+              const subjectPerformance = ScoreCalculator.getSubjectPerformance(
+                data.correct,
+                data.total
               );
+
               return (
                 <View
                   key={subject}
@@ -156,7 +105,7 @@ const ResultScreen: React.FC<ResultScreenProps> = ({
                       {subject}
                     </Text>
                     <Text className="text-blue-600 font-bold text-lg">
-                      {subjectPercentage}%
+                      {subjectPerformance.percentage}%
                     </Text>
                   </View>
                   <View className="flex-row justify-between">
@@ -164,19 +113,9 @@ const ResultScreen: React.FC<ResultScreenProps> = ({
                       Correct: {data.correct}/{data.total}
                     </Text>
                     <Text
-                      className={`font-semibold ${
-                        subjectPercentage >= 70
-                          ? "text-green-600"
-                          : subjectPercentage >= 50
-                            ? "text-yellow-600"
-                            : "text-red-600"
-                      }`}
+                      className={`font-semibold ${subjectPerformance.color}`}
                     >
-                      {subjectPercentage >= 70
-                        ? "Excellent"
-                        : subjectPercentage >= 50
-                          ? "Good"
-                          : "Poor"}
+                      {subjectPerformance.grade}
                     </Text>
                   </View>
 
@@ -184,13 +123,13 @@ const ResultScreen: React.FC<ResultScreenProps> = ({
                   <View className="mt-2 bg-gray-200 rounded-full h-2">
                     <View
                       className={`h-2 rounded-full ${
-                        subjectPercentage >= 70
+                        subjectPerformance.percentage >= 70
                           ? "bg-green-500"
-                          : subjectPercentage >= 50
+                          : subjectPerformance.percentage >= 50
                             ? "bg-yellow-500"
                             : "bg-red-500"
                       }`}
-                      style={{ width: `${subjectPercentage}%` }}
+                      style={{ width: `${subjectPerformance.percentage}%` }}
                     />
                   </View>
                 </View>
@@ -205,26 +144,11 @@ const ResultScreen: React.FC<ResultScreenProps> = ({
             📚 Study Recommendations:
           </Text>
           <View>
-            {Object.entries(results.subjectBreakdown)
-              .filter(([_, data]) => data.correct / data.total < 0.7)
-              .map(([subject, data]) => {
-                const subjectPercentage = Math.round(
-                  (data.correct / data.total) * 100
-                );
-                return (
-                  <Text key={subject} className="text-blue-700 text-sm">
-                    • Focus more on {subject} (scored {subjectPercentage}%)
-                  </Text>
-                );
-              })}
-            {Object.entries(results.subjectBreakdown).every(
-              ([_, data]) => data.correct / data.total >= 0.7
-            ) && (
-              <Text className="text-blue-700 text-sm">
-                • Great job! You've performed well across all subjects. Keep
-                practicing to maintain your level.
+            {studyRecommendations.map((recommendation, index) => (
+              <Text key={index} className="text-blue-700 text-sm">
+                • {recommendation}
               </Text>
-            )}
+            ))}
           </View>
         </View>
 

@@ -1,7 +1,10 @@
-// screens/InstructionScreen.tsx - Updated with mode-based information
+// app/screens/InstructionScreen.tsx - Updated with extracted constants
 import React from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { ExamConfig } from "../cbtApp";
+
+// Import our new types and utilities
+import { getModeConfig, shouldUseTimer } from "../data/examTypes";
+import { ExamConfig } from "../utils/examValidator";
 
 interface InstructionScreenProps {
   examConfig: ExamConfig;
@@ -14,9 +17,10 @@ export default function InstructionScreen({
   onStartExam,
   onCancel,
 }: InstructionScreenProps) {
-  const isTimedExam = examConfig.mode === "TIMED";
+  const isTimedExam = shouldUseTimer(examConfig.mode);
   const isStudyMode = examConfig.mode === "STUDY";
   const isNewsMode = examConfig.mode === "NEWS";
+  const modeConfig = getModeConfig(examConfig.mode);
 
   const getModeSpecificInstructions = () => {
     switch (examConfig.mode) {
@@ -78,6 +82,25 @@ export default function InstructionScreen({
     }
   };
 
+  const getButtonColor = () => {
+    switch (examConfig.mode) {
+      case "TIMED":
+        return "bg-red-600";
+      case "STUDY":
+        return "bg-green-600";
+      case "NEWS":
+        return "bg-purple-600";
+      default:
+        return "bg-blue-600";
+    }
+  };
+
+  const getButtonText = () => {
+    if (isNewsMode) return "VIEW NEWS";
+    if (isTimedExam) return "START TIMED EXAM";
+    return `START ${examConfig.mode}`;
+  };
+
   return (
     <ScrollView className="flex-1 items-center mt-5 p-6 ">
       <Text className="text-2xl font-bold mb-4">Instructions</Text>
@@ -92,8 +115,11 @@ export default function InstructionScreen({
               {"\n"}• Mode: {examConfig.mode}
               {"\n"}• Exam Type: {examConfig.examType}
               {"\n"}• Subjects: {examConfig.subjects.join(", ")}
-              {"\n"}• Questions per subject: 40
-              {"\n"}• Total questions: {examConfig.subjects.length * 40}
+              {"\n"}• Questions per subject:{" "}
+              {examConfig.numberOfQuestions || 40}
+              {"\n"}• Total questions:{" "}
+              {examConfig.subjects.length *
+                (examConfig.numberOfQuestions || 40)}
               {isTimedExam && (
                 <>
                   {"\n"}• Duration: {examConfig.duration.minutes} minutes and{" "}
@@ -112,7 +138,9 @@ export default function InstructionScreen({
                   Next buttons.{"\n"}
                   3. You can switch between subjects by clicking on the subject
                   tabs.{"\n"}
-                  4. Each subject has 40 questions numbered 1-40.{"\n"}
+                  4. Each subject has {examConfig.numberOfQuestions || 40}{" "}
+                  questions numbered 1-{examConfig.numberOfQuestions || 40}.
+                  {"\n"}
                   {isStudyMode ? (
                     <>
                       5. In Study Mode, you'll receive instant feedback after
@@ -211,22 +239,10 @@ export default function InstructionScreen({
 
           <TouchableOpacity
             onPress={onStartExam}
-            className={`flex-1 p-4 rounded-lg ${
-              isTimedExam
-                ? "bg-red-600"
-                : examConfig.mode === "STUDY"
-                  ? "bg-green-600"
-                  : examConfig.mode === "NEWS"
-                    ? "bg-purple-600"
-                    : "bg-blue-600"
-            }`}
+            className={`flex-1 p-4 rounded-lg ${getButtonColor()}`}
           >
             <Text className="text-white text-center font-bold">
-              {isNewsMode
-                ? "VIEW NEWS"
-                : isTimedExam
-                  ? "START TIMED EXAM"
-                  : `START ${examConfig.mode}`}
+              {getButtonText()}
             </Text>
           </TouchableOpacity>
         </View>

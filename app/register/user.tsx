@@ -1,3 +1,4 @@
+// app/register/user.tsx
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -84,7 +85,7 @@ const CLASS_LEVELS = [
   "JAMB Candidate",
   "WAEC Candidate",
 ];
-const EXAM_TYPES = ["JAMB UTME", "WAEC", "NECO", "NABTEB"];
+const EXAM_TYPES = ["JAMB UTME", "WAEC", "NECO"];
 
 export default function NewUserRegistration() {
   const router = useRouter();

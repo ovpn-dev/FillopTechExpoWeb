@@ -1,4 +1,4 @@
-// services/authService.ts
+// app/services/authService.ts
 import { LoginResponse, User } from "../types/auth.types";
 
 // Mock user database - in future this will be API calls

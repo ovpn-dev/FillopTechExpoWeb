@@ -1,4 +1,4 @@
-// data/nigerianStatesAndLGAs.ts
+// app/data/nigerianStatesAndLGAs.ts
 export const NIGERIAN_STATES_AND_LGAS = {
   Abia: [
     "Aba South",

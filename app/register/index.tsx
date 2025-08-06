@@ -1,6 +1,7 @@
-import { useRouter } from 'expo-router';
-import { Text, View } from 'react-native';
-import Button from './../components/Button';
+// app/register/index.tsx
+import { useRouter } from "expo-router";
+import { Text, View } from "react-native";
+import Button from "./../components/Button";
 
 export default function RegisterTypeScreen() {
   const router = useRouter();
@@ -11,12 +12,12 @@ export default function RegisterTypeScreen() {
 
       <Button
         title="New User"
-        onPress={() => router.push('/register/user')}
+        onPress={() => router.push("/register/user")}
         className="w-full mb-4"
       />
       <Button
         title="Corporate"
-        onPress={() => router.push('/register/corporate')}
+        onPress={() => router.push("/register/corporate")}
         className="w-full"
       />
     </View>
