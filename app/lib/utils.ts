@@ -118,9 +118,8 @@ export function shuffleArray<T>(array: T[]): T[] {
 export function getExamDuration(examType: string): number {
   const durations: Record<string, number> = {
     "JAMB UTME": 180, // 3 hours
-    WAEC: 120, // 2 hours
-    NECO: 120, // 2 hours
-    NABTEB: 120, // 2 hours
+    WAEC: 240, // 4 hours
+    NECO: 240, // 4 hours
   };
   return durations[examType] || 120;
 }

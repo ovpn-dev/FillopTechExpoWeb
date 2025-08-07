@@ -1,4 +1,4 @@
-// components/TopBar.tsx - Updated with extracted utilities
+// components/TopBar.tsx - Enhanced with progress indicators and subject switching
 import React, { useEffect, useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 
@@ -9,6 +9,9 @@ import {
   getTimeDisplayBackground,
   getTimeDisplayColor,
 } from "../utils/timeFormatter";
+
+// Import services for progress calculation
+import { QuestionService } from "../services/questionService";
 
 // Import existing components
 import Calculator from "./Calculator";
@@ -23,6 +26,8 @@ interface TopBarProps {
   onSubjectChange?: (subject: string) => void;
   examStartTime?: number | null;
   showTimer?: boolean;
+  // New prop for progress tracking in exam mode
+  userAnswers?: { [questionId: string]: string };
 }
 
 const TopBar: React.FC<TopBarProps> = ({
@@ -34,6 +39,7 @@ const TopBar: React.FC<TopBarProps> = ({
   onSubjectChange,
   examStartTime,
   showTimer = false,
+  userAnswers = {},
 }) => {
   const [timeRemaining, setTimeRemaining] = useState(examConfig.totalTime);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -83,6 +89,25 @@ const TopBar: React.FC<TopBarProps> = ({
     setShowCalculator(!showCalculator);
   };
 
+  const handleSubjectSwitch = (subject: string) => {
+    if (onSubjectChange) {
+      onSubjectChange(subject);
+    }
+  };
+
+  // Helper function to get answered questions count for a subject
+  const getAnsweredQuestionsInSubject = (subject: string): number => {
+    const allQuestions = QuestionService.generateQuestionsForSubject(
+      subject,
+      examConfig.numberOfQuestions || 40
+    );
+    return QuestionService.getAnsweredQuestionsInSubject(
+      allQuestions,
+      subject,
+      userAnswers
+    );
+  };
+
   // Use our utility functions for time display
   const displayTime = showTimer
     ? formatTime(timeRemaining)
@@ -105,28 +130,42 @@ const TopBar: React.FC<TopBarProps> = ({
           <Text className="text-white text-xl font-bold">◀</Text>
         </TouchableOpacity>
 
-        {/* Subject Tags */}
+        {/* Enhanced Subject Tags with Progress */}
         <View className="flex-1 flex-row flex-wrap gap-2">
           {examConfig.subjects.map((subject, index) => {
             const isActive = currentSubject === subject;
             const isClickable = showSubmit && onSubjectChange;
 
+            // Get progress information for exam mode
+            const answeredCount = showSubmit
+              ? getAnsweredQuestionsInSubject(subject)
+              : 0;
+            const totalQuestions = examConfig.numberOfQuestions || 40;
+            const progressText = showSubmit
+              ? `${answeredCount}/${totalQuestions}`
+              : "";
+
             return (
               <TouchableOpacity
                 key={subject}
                 onPress={() =>
-                  isClickable ? onSubjectChange(subject) : undefined
+                  isClickable ? handleSubjectSwitch(subject) : undefined
                 }
                 disabled={!isClickable}
                 className={`px-3 py-1 rounded ${
                   isActive && showSubmit ? "bg-green-600" : "bg-blue-600"
                 }`}
               >
-                <Text className="text-white text-sm font-semibold">
+                <Text className="text-white text-sm font-semibold text-center">
                   {subject.length > 12
                     ? subject.substring(0, 12) + "..."
                     : subject}
                 </Text>
+                {showSubmit && (
+                  <Text className="text-white text-xs text-center">
+                    {progressText}
+                  </Text>
+                )}
               </TouchableOpacity>
             );
           })}

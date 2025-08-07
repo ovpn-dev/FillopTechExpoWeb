@@ -1,4 +1,4 @@
-// app/screens/ExamScreen.tsx - Refactored to use QuestionService
+// app/screens/ExamScreen.tsx - Cleaned version without subject switcher
 import React from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
@@ -86,11 +86,6 @@ export default function ExamScreen({
     onQuestionChange(questionIndex);
   };
 
-  const handleSubjectSwitch = (subject: string) => {
-    onSubjectChange(subject);
-    onQuestionChange(0); // Reset to first question when switching subjects
-  };
-
   const getAnsweredQuestionsInSubject = (subject: string) => {
     const allQuestions = QuestionService.generateQuestionsForSubject(
       subject,
@@ -109,37 +104,6 @@ export default function ExamScreen({
         className="flex-1 p-6"
         style={{ minHeight: 0, display: "flex", flexDirection: "column" }}
       >
-        {/* Subject Switcher */}
-        <View
-          className="flex-row flex-wrap gap-2 mb-4"
-          style={{ flexShrink: 0 }}
-        >
-          {examConfig.subjects.map((subject) => {
-            const isActive = subject === currentSubject;
-            const answeredCount = getAnsweredQuestionsInSubject(subject);
-            const totalQuestions = examConfig.numberOfQuestions || 40;
-
-            return (
-              <TouchableOpacity
-                key={subject}
-                onPress={() => handleSubjectSwitch(subject)}
-                className={`px-3 py-2 rounded-lg ${
-                  isActive ? "bg-green-600" : "bg-blue-600"
-                }`}
-              >
-                <Text className="text-white font-semibold text-center">
-                  {subject.length > 12
-                    ? subject.substring(0, 12) + "..."
-                    : subject}
-                </Text>
-                <Text className="text-white text-xs text-center">
-                  {answeredCount}/{totalQuestions}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
         {/* Current Subject Header */}
         <View style={{ flexShrink: 0 }} className="mb-6">
           <Text className="text-2xl font-bold text-green-700 mb-2">
@@ -148,6 +112,10 @@ export default function ExamScreen({
           <Text className="text-lg">
             Question {navigationInfo.currentQuestionNumber} of{" "}
             {navigationInfo.totalQuestionsInSubject}
+          </Text>
+          <Text className="text-sm text-gray-600">
+            Progress: {getAnsweredQuestionsInSubject(currentSubject)} of{" "}
+            {examConfig.numberOfQuestions || 40} answered
           </Text>
         </View>
 
@@ -258,8 +226,7 @@ export default function ExamScreen({
           </View>
 
           <Text className="text-sm text-gray-600 mt-2">
-            Answered {getAnsweredQuestionsInSubject(currentSubject)} of{" "}
-            {examConfig.numberOfQuestions || 40} in this subject
+            Green = Current • Blue = Answered • Red = Unanswered
           </Text>
         </View>
 

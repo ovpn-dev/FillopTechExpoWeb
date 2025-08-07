@@ -129,7 +129,7 @@ export default function CorporateRegistration() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push("/cbtApp");
     } catch (error) {
       Alert.alert("Error", "Failed to activate account. Please try again.");
     } finally {

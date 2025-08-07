@@ -17,6 +17,7 @@ export const ALL_SUBJECTS = [
   "BASIC WORKSHOP",
   "GEOGRAPHY",
   "ECONOMICS",
+  "ARABIC",
 ] as const;
 
 // Type for type safety
@@ -43,7 +44,6 @@ export const getMaxSubjectsForExamType = (examType: ExamType): number => {
       return 4;
     case "WAEC":
     case "NECO":
-    case "NABTEB":
       return 9;
     default:
       return 9;

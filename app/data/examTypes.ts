@@ -1,6 +1,6 @@
 // app/data/examTypes.ts
 export type ExamMode = "TIMED" | "UNTIMED" | "STUDY" | "NEWS";
-export type ExamType = "JAMB" | "WAEC" | "NECO" | "NABTEB" | "OTHER";
+export type ExamType = "JAMB" | "WAEC" | "NECO" | "OTHER";
 
 export const EXAM_MODES = [
   {
@@ -91,12 +91,6 @@ export const QUESTION_SOURCES = {
     "2023 NECO Questions",
     "2022 NECO Questions",
     "2021 NECO Questions",
-  ],
-  NABTEB: [
-    "Random Questions",
-    "2024 NABTEB Questions",
-    "2023 NABTEB Questions",
-    "2022 NABTEB Questions",
   ],
   OTHER: ["Random Questions", "Custom Questions", "Practice Bank"],
 } as const;
