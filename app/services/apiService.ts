@@ -118,4 +118,26 @@ class ApiService {
   }
 }
 
+// Add token storage methods
+export const TokenStorage = {
+  async getToken(): Promise<string | null> {
+    // You'll need to install: npm install @react-native-async-storage/async-storage
+    // import AsyncStorage from '@react-native-async-storage/async-storage';
+    // return await AsyncStorage.getItem('authToken');
+
+    // For now, return null - implement proper storage later
+    return null;
+  },
+
+  async setToken(token: string): Promise<void> {
+    // await AsyncStorage.setItem('authToken', token);
+    console.log("Token stored:", token);
+  },
+
+  async removeToken(): Promise<void> {
+    // await AsyncStorage.removeItem('authToken');
+    console.log("Token removed");
+  },
+};
+
 export default new ApiService();

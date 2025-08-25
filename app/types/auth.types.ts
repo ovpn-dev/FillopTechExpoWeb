@@ -1,13 +1,16 @@
-// app/types/auth.types.ts
+// app/types/auth.types.ts - Updated to support API integration
 export interface User {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
+  passcode: string; // For display purposes (legacy)
   profileImage: string;
   institution: string;
-  passcode: string;
+  email: string;
   registrationDate: string;
+  // New API fields
+  username: string;
+  role: string;
 }
 
 export interface AuthState {

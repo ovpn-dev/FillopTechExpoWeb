@@ -1,5 +1,11 @@
-// app/contexts/AuthContext.tsx
-import React, { createContext, ReactNode, useContext, useReducer } from "react";
+// app/contexts/AuthContext.tsx - Updated with API integration
+import React, {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useReducer,
+} from "react";
 import { AuthService } from "../services/authService";
 import { AuthContextType, AuthState, User } from "../types/auth.types";
 
@@ -11,8 +17,11 @@ const initialState: AuthState = {
   error: null,
 };
 
-// Action types for auth reducer
+// Extended action types for auth reducer
 type AuthAction =
+  | { type: "INITIALIZE_START" }
+  | { type: "INITIALIZE_SUCCESS"; payload: User }
+  | { type: "INITIALIZE_COMPLETE" }
   | { type: "LOGIN_START" }
   | { type: "LOGIN_SUCCESS"; payload: User }
   | { type: "LOGIN_FAILURE"; payload: string }
@@ -22,6 +31,28 @@ type AuthAction =
 // Auth reducer to manage authentication state
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   switch (action.type) {
+    case "INITIALIZE_START":
+      return {
+        ...state,
+        isLoading: true,
+        error: null,
+      };
+
+    case "INITIALIZE_SUCCESS":
+      return {
+        ...state,
+        isAuthenticated: true,
+        user: action.payload,
+        isLoading: false,
+        error: null,
+      };
+
+    case "INITIALIZE_COMPLETE":
+      return {
+        ...state,
+        isLoading: false,
+      };
+
     case "LOGIN_START":
       return {
         ...state,
@@ -49,7 +80,8 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 
     case "LOGOUT":
       return {
-        ...initialState, // Reset to initial state
+        ...initialState,
+        isLoading: false, // Don't show loading after logout
       };
 
     case "CLEAR_ERROR":
@@ -63,8 +95,16 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   }
 };
 
+// Extended AuthContextType
+interface ExtendedAuthContextType extends AuthContextType {
+  loginWithEmailPassword: (email: string, password: string) => Promise<boolean>;
+  loginWithPasscode: (passcode: string) => Promise<boolean>;
+}
+
 // Create the context
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<ExtendedAuthContextType | undefined>(
+  undefined
+);
 
 // Auth Provider Props
 interface AuthProviderProps {
@@ -75,12 +115,39 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [authState, dispatch] = useReducer(authReducer, initialState);
 
-  // Login function
-  const login = async (passcode: string): Promise<boolean> => {
+  // Initialize authentication on app startup
+  useEffect(() => {
+    const initializeAuth = async () => {
+      dispatch({ type: "INITIALIZE_START" });
+
+      try {
+        const user = await AuthService.initializeAuth();
+        if (user) {
+          dispatch({ type: "INITIALIZE_SUCCESS", payload: user });
+        } else {
+          dispatch({ type: "INITIALIZE_COMPLETE" });
+        }
+      } catch (error) {
+        console.error("Auth initialization failed:", error);
+        dispatch({ type: "INITIALIZE_COMPLETE" });
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  // Login with email and password (new API-based method)
+  const loginWithEmailPassword = async (
+    email: string,
+    password: string
+  ): Promise<boolean> => {
     dispatch({ type: "LOGIN_START" });
 
     try {
-      const response = await AuthService.login(passcode);
+      const response = await AuthService.loginWithEmailPassword(
+        email,
+        password
+      );
 
       if (response.success && response.user) {
         dispatch({ type: "LOGIN_SUCCESS", payload: response.user });
@@ -101,6 +168,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Legacy passcode login (for backward compatibility)
+  const loginWithPasscode = async (passcode: string): Promise<boolean> => {
+    dispatch({ type: "LOGIN_START" });
+
+    try {
+      const response = await AuthService.loginWithPasscode(passcode);
+
+      if (response.success && response.user) {
+        dispatch({ type: "LOGIN_SUCCESS", payload: response.user });
+        console.log("Login successful:", response.user.firstName);
+        return true;
+      } else {
+        dispatch({
+          type: "LOGIN_FAILURE",
+          payload: response.error || "Login failed",
+        });
+        return false;
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
+      dispatch({ type: "LOGIN_FAILURE", payload: errorMessage });
+      return false;
+    }
+  };
+
+  // Legacy login method (maintains backward compatibility)
+  const login = loginWithPasscode;
+
   // Logout function
   const logout = async (): Promise<void> => {
     try {
@@ -120,9 +216,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Context value
-  const contextValue: AuthContextType = {
+  const contextValue: ExtendedAuthContextType = {
     authState,
-    login,
+    login, // Legacy method
+    loginWithEmailPassword, // New API method
+    loginWithPasscode, // Explicit passcode method
     logout,
     clearError,
   };
@@ -133,7 +231,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 };
 
 // Custom hook to use auth context
-export const useAuth = (): AuthContextType => {
+export const useAuth = (): ExtendedAuthContextType => {
   const context = useContext(AuthContext);
 
   if (context === undefined) {

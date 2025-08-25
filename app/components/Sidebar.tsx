@@ -50,12 +50,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
     <>
       <View className="bg-blue-400 p-5 shadow-lg">
         <View className="bg-white rounded-xl p-5 items-center shadow-md">
-          <View className="bg-blue-600 rounded-full p-4 mb-4 shadow-sm">
+          {/* <View className="bg-blue-600 rounded-full p-4 mb-4 shadow-sm">
             <Image
               source={{ uri: user.profileImage }}
               className="w-16 h-16 rounded-full"
             />
-          </View>
+          </View> */}
           <Text className="text-lg font-bold mb-4 text-blue-800">
             Your Profile
           </Text>
