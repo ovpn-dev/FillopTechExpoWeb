@@ -1,46 +1,28 @@
-// types/registration.ts
+// types/registration.ts - Simplified to match document requirements
 export interface UserRegistrationData {
   email: string;
   surname: string;
   firstname: string;
-  middlename?: string;
   phone: string;
-  parentPhone?: string;
   gender: "Male" | "Female";
-  dateOfBirth: string;
   address: string;
+  houseNumber: string;
   lga: string;
   state: string;
-  nationality: string;
-  passport?: string;
-  subjects: string[];
-  examType: "JAMB UTME" | "WAEC" | "NECO";
-  schoolName: string;
-  classLevel: string;
-  previousExamNumber?: string;
-  disability?: string;
-  emergencyContact: string;
-  emergencyPhone: string;
+  passport?: string; // Photo upload
+  subjects: string[]; // Maximum 5 subjects
+  examType: "JAMB" | "WAEC" | "NECO";
 }
 
 export interface CorporateRegistrationData {
   email: string;
   companyName: string;
-  companyType: string;
-  rcNumber?: string;
-  phone: string;
-  alternativePhone?: string;
+  contactPhone: string;
   address: string;
   lga: string;
   state: string;
-  logo?: string;
-  plan: string;
-  contactPersonName: string;
-  contactPersonRole: string;
-  website?: string;
-  yearsOfOperation?: string;
-  numberOfStudents: string;
-  preferredExamTypes: string[];
+  logo?: string; // Logo upload
+  plan: string; // Selected plan ID
 }
 
 export interface SubscriptionPlan {
@@ -48,7 +30,6 @@ export interface SubscriptionPlan {
   name: string;
   price: number;
   duration: string;
-  maxStudents: number;
 }
 
 export interface PaymentInfo {
@@ -57,6 +38,8 @@ export interface PaymentInfo {
   registrationType: "user" | "corporate";
   planDetails?: SubscriptionPlan;
   userDetails: UserRegistrationData | CorporateRegistrationData;
+  examType?: string; // For user registrations
+  planId?: string; // For corporate registrations
 }
 
 export interface ActivationData {

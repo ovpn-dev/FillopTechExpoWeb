@@ -1,4 +1,4 @@
-// app/register/user.tsx
+// app/register/user.tsx - Updated with API integration
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -13,110 +13,37 @@ import {
   NIGERIAN_STATES,
   NIGERIAN_STATES_AND_LGAS,
 } from "../data/nigerianStatesAndLGAs";
+import { ALL_SUBJECTS } from "../data/subjects";
+import apiService, { ApiError } from "../services/apiService";
+import { PricingCalculator } from "../utils/pricingCalculator";
 import Button from "./../components/Button";
 import Dropdown from "./../components/Dropdown";
 
-const JAMB_SUBJECTS = [
-  "English Language",
-  "Mathematics",
-  "Physics",
-  "Chemistry",
-  "Biology",
-  "Agricultural Science",
-  "Economics",
-  "Government",
-  "Literature in English",
-  "History",
-  "Geography",
-  "Christian Religious Studies",
-  "Islamic Religious Studies",
-  "Hausa",
-  "Igbo",
-  "Yoruba",
-  "French",
-  "Arabic",
-  "Fine Arts",
-  "Music",
-];
-
-const WAEC_SUBJECTS = [
-  "English Language",
-  "Mathematics",
-  "Physics",
-  "Chemistry",
-  "Biology",
-  "Further Mathematics",
-  "Agricultural Science",
-  "Economics",
-  "Government",
-  "Literature in English",
-  "History",
-  "Geography",
-  "Christian Religious Studies",
-  "Islamic Religious Studies",
-  "Commerce",
-  "Accounting",
-  "Book Keeping",
-  "Marketing",
-  "Office Practice",
-  "Data Processing",
-  "Technical Drawing",
-  "Building Construction",
-  "Metal Work",
-  "Wood Work",
-  "Auto Mechanics",
-  "Electrical Installation",
-  "Electronics",
-  "Applied Electricity",
-  "Home Economics",
-  "Food and Nutrition",
-  "Clothing and Textiles",
-  "Fine Arts",
-  "Music",
-  "Physical Education",
-  "Health Education",
-];
-
-const CLASS_LEVELS = [
-  "SS1",
-  "SS2",
-  "SS3",
-  "Graduate",
-  "JAMB Candidate",
-  "WAEC Candidate",
-];
-const EXAM_TYPES = ["JAMB UTME", "WAEC", "NECO"];
+const EXAM_TYPES = ["JAMB", "WAEC", "NECO"];
 
 export default function NewUserRegistration() {
   const router = useRouter();
 
   const [form, setForm] = useState({
     email: "",
+    password: "",
+    confirmPassword: "",
     surname: "",
     firstname: "",
-    middlename: "",
     phone: "",
-    parentPhone: "",
-    gender: "",
-    dateOfBirth: "",
+    gender: "Male" as "Male" | "Female",
     address: "",
+    houseNumber: "",
     lga: "",
     state: "",
-    nationality: "Nigerian",
-    passport: "",
     subjects: [] as string[],
-    examType: "",
-    schoolName: "",
-    classLevel: "",
-    previousExamNumber: "",
-    disability: "",
-    emergencyContact: "",
-    emergencyPhone: "",
+    examType: "JAMB",
+    passport: "", // For photo upload
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [showSubjects, setShowSubjects] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
 
   const handleChange = (field: string, value: string | string[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -124,14 +51,14 @@ export default function NewUserRegistration() {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
 
-    if (field === "examType" && value) {
-      setShowSubjects(true);
-      setForm((prev) => ({ ...prev, subjects: [] }));
-    }
-
     // Reset LGA when state changes
     if (field === "state") {
       setForm((prev) => ({ ...prev, lga: "" }));
+    }
+
+    // Reset subjects when exam type changes
+    if (field === "examType") {
+      setForm((prev) => ({ ...prev, subjects: [] }));
     }
   };
 
@@ -147,7 +74,6 @@ export default function NewUserRegistration() {
 
   const handleSubjectToggle = (subject: string) => {
     const currentSubjects = form.subjects;
-    const maxSubjects = form.examType === "JAMB UTME" ? 4 : 9;
 
     if (currentSubjects.includes(subject)) {
       handleChange(
@@ -155,54 +81,75 @@ export default function NewUserRegistration() {
         currentSubjects.filter((s) => s !== subject)
       );
     } else {
-      if (currentSubjects.length < maxSubjects) {
+      if (currentSubjects.length < 5) {
         handleChange("subjects", [...currentSubjects, subject]);
       } else {
-        Alert.alert(
-          "Subject Limit Reached",
-          `You can only select maximum ${maxSubjects} subjects for ${form.examType}`
-        );
+        Alert.alert("Subject Limit", "You can only select maximum 5 subjects");
       }
     }
   };
 
-  const validateForm = () => {
+  const verifyEmail = async () => {
+    if (!form.email || !/\S+@\S+\.\S+/.test(form.email)) {
+      Alert.alert("Error", "Please enter a valid email address");
+      return;
+    }
+
+    // TODO: Implement actual email verification with backend
+    // For now, simulate verification
+    Alert.alert(
+      "Email Verification",
+      "A verification code has been sent to your email. Please check and confirm.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Verified",
+          onPress: () => {
+            setEmailVerified(true);
+            Alert.alert("Success", "Email verified successfully!");
+          },
+        },
+      ]
+    );
+  };
+
+  const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!form.email) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(form.email))
-      newErrors.email = "Invalid email format";
+    // Email validation
+    if (!form.email) {
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(form.email)) {
+      newErrors.email = "Please enter a valid email address";
+    }
 
+    // Password validation
+    if (!form.password) {
+      newErrors.password = "Password is required";
+    } else if (form.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters";
+    }
+
+    if (form.password !== form.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
+    }
+
+    // Other validations
     if (!form.surname) newErrors.surname = "Surname is required";
     if (!form.firstname) newErrors.firstname = "First name is required";
     if (!form.phone) newErrors.phone = "Phone number is required";
-    if (!form.gender) newErrors.gender = "Gender is required";
-    if (!form.dateOfBirth) newErrors.dateOfBirth = "Date of birth is required";
     if (!form.address) newErrors.address = "Address is required";
+    if (!form.houseNumber) newErrors.houseNumber = "House number is required";
     if (!form.lga) newErrors.lga = "LGA is required";
     if (!form.state) newErrors.state = "State is required";
     if (!form.examType) newErrors.examType = "Exam type is required";
-    if (!form.schoolName) newErrors.schoolName = "School name is required";
-    if (!form.classLevel) newErrors.classLevel = "Class/Level is required";
-    if (!form.emergencyContact)
-      newErrors.emergencyContact = "Emergency contact is required";
-    if (!form.emergencyPhone)
-      newErrors.emergencyPhone = "Emergency phone is required";
-
-    if (form.examType === "JAMB UTME" && form.subjects.length !== 4) {
-      newErrors.subjects = "Please select exactly 4 subjects for JAMB UTME";
-    } else if (form.examType === "WAEC" && form.subjects.length < 5) {
-      newErrors.subjects = "Please select at least 5 subjects for WAEC";
-    }
-
-    if (form.examType === "JAMB UTME") {
-      if (!form.subjects.includes("English Language")) {
-        newErrors.subjects = "English Language is compulsory for JAMB UTME";
-      }
-      if (!form.subjects.includes("Mathematics")) {
-        newErrors.subjects = "Mathematics is compulsory for JAMB UTME";
-      }
-    }
+    if (form.subjects.length === 0)
+      newErrors.subjects = "Please select at least 1 subject";
+    if (form.subjects.length > 5)
+      newErrors.subjects = "Maximum 5 subjects allowed";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -215,38 +162,87 @@ export default function NewUserRegistration() {
     }
 
     setLoading(true);
+
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      console.log("User registration data:", form);
+      // Generate username from name
+      const username = apiService.generateUsername(
+        form.surname,
+        form.firstname
+      );
+
+      // Prepare registration data for API
+      const registrationData = {
+        username,
+        email: form.email,
+        password: form.password,
+        role: "student" as const,
+      };
+
+      // Call registration API
+      const response = await apiService.register(registrationData);
+
+      // Store the token (you might want to use AsyncStorage or SecureStore)
+      // await AsyncStorage.setItem('authToken', response.token);
+
+      // Store additional user data locally for later profile update
+      const additionalData = {
+        surname: form.surname,
+        firstname: form.firstname,
+        phone: form.phone,
+        gender: form.gender,
+        address: form.address,
+        houseNumber: form.houseNumber,
+        lga: form.lga,
+        state: form.state,
+        subjects: form.subjects,
+        examType: form.examType,
+      };
+
+      // Navigate with consistent parameters
+      router.push({
+        pathname: "/register/payment-info",
+        params: {
+          registrationType: "user",
+          examType: form.examType,
+          userDetails: JSON.stringify({
+            ...additionalData,
+            userId: response.user.id,
+            username: response.user.username,
+            email: response.user.email,
+          }),
+          authToken: response.token,
+        },
+      });
 
       Alert.alert(
-        "Registration Successful",
-        "Your registration has been submitted successfully. You will be redirected to payment.",
-        [{ text: "OK", onPress: () => router.push("/payment-info") }]
+        "Success",
+        "Registration successful! Please proceed to payment."
       );
     } catch (error) {
-      Alert.alert("Error", "Registration failed. Please try again.");
+      const apiError = error as ApiError & { status?: number };
+
+      if (apiError.status === 400 && apiError.errors) {
+        // Handle validation errors from backend
+        const backendErrors: Record<string, string> = {};
+        Object.entries(apiError.errors).forEach(([field, messages]) => {
+          backendErrors[field] = messages[0]; // Take first error message
+        });
+        setErrors(backendErrors);
+      } else {
+        Alert.alert(
+          "Registration Failed",
+          apiError.message || "An error occurred during registration"
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const getAvailableSubjects = () => {
-    return form.examType === "JAMB UTME" ? JAMB_SUBJECTS : WAEC_SUBJECTS;
+  const getEstimatedPrice = (): number => {
+    return PricingCalculator.calculateUserPrice(form.examType);
   };
 
-  const getRequiredSubjectsText = () => {
-    if (form.examType === "JAMB UTME") {
-      return "Select exactly 4 subjects (English & Math compulsory)";
-    } else if (form.examType === "WAEC") {
-      return "Select 5-9 subjects (English & Math recommended)";
-    }
-    return "";
-  };
-
-  function onBack() {
-    router.back();
-  }
   return (
     <ScrollView
       className="flex-1 bg-gray-50 p-4"
@@ -255,31 +251,40 @@ export default function NewUserRegistration() {
       <View className="bg-white rounded-lg shadow-sm">
         {/* Header */}
         <View className="flex-row bg-blue-600 p-4 rounded-t-lg">
-          {/* Back Button */}
-          <TouchableOpacity onPress={onBack} className="mr-4">
-            <Text className="text-white text-xl font-bold">◀</Text>
+          <TouchableOpacity onPress={() => router.back()} className="mr-4">
+            <Text className="text-white text-xl font-bold">←</Text>
           </TouchableOpacity>
           <View className="flex-column">
             <Text className="text-xl font-bold text-white">
-              Student Registration
+              New User Registration
             </Text>
-            <Text className="text-blue-100">
-              FILLOP CBT GURU - Register for JAMB/WAEC Practice
-            </Text>
+            <Text className="text-blue-100">FILLOP CBT GURU</Text>
           </View>
         </View>
 
         <View className="p-4">
-          {/* Personal Information */}
+          {/* Price Banner */}
+          <View className="bg-green-50 border-2 border-green-200 rounded-lg p-3 mb-6">
+            <Text className="text-green-800 font-bold text-center">
+              Registration Fee:{" "}
+              {PricingCalculator.formatCurrency(getEstimatedPrice())}
+            </Text>
+            <Text className="text-green-600 text-center text-sm">
+              One-time payment for {form.examType} access
+            </Text>
+          </View>
+
+          {/* Email and Password Section */}
           <View className="mb-6">
             <Text className="text-lg font-semibold mb-3 text-gray-800 border-b border-gray-200 pb-2">
-              👤 Personal Information
+              Account Information
             </Text>
 
-            {/* Email */}
             <TextInput
               placeholder="Email Address *"
-              className={`border p-3 rounded-lg mb-3 text-sm ${errors.email ? "border-red-500" : "border-gray-300"}`}
+              className={`border p-3 rounded-lg mb-3 text-sm ${
+                errors.email ? "border-red-500" : "border-gray-300"
+              }`}
               keyboardType="email-address"
               autoCapitalize="none"
               value={form.email}
@@ -289,12 +294,51 @@ export default function NewUserRegistration() {
               <Text className="text-red-500 text-xs mb-2">{errors.email}</Text>
             )}
 
+            <TextInput
+              placeholder="Password (minimum 6 characters) *"
+              className={`border p-3 rounded-lg mb-3 text-sm ${
+                errors.password ? "border-red-500" : "border-gray-300"
+              }`}
+              secureTextEntry
+              value={form.password}
+              onChangeText={(text) => handleChange("password", text)}
+            />
+            {errors.password && (
+              <Text className="text-red-500 text-xs mb-2">
+                {errors.password}
+              </Text>
+            )}
+
+            <TextInput
+              placeholder="Confirm Password *"
+              className={`border p-3 rounded-lg mb-3 text-sm ${
+                errors.confirmPassword ? "border-red-500" : "border-gray-300"
+              }`}
+              secureTextEntry
+              value={form.confirmPassword}
+              onChangeText={(text) => handleChange("confirmPassword", text)}
+            />
+            {errors.confirmPassword && (
+              <Text className="text-red-500 text-xs mb-2">
+                {errors.confirmPassword}
+              </Text>
+            )}
+          </View>
+
+          {/* Personal Information */}
+          <View className="mb-6">
+            <Text className="text-lg font-semibold mb-3 text-gray-800 border-b border-gray-200 pb-2">
+              Personal Information
+            </Text>
+
             {/* Name Row */}
             <View className="flex-row gap-2 mb-3">
               <View className="flex-1">
                 <TextInput
                   placeholder="Surname *"
-                  className={`border p-3 rounded-lg text-sm ${errors.surname ? "border-red-500" : "border-gray-300"}`}
+                  className={`border p-3 rounded-lg text-sm ${
+                    errors.surname ? "border-red-500" : "border-gray-300"
+                  }`}
                   value={form.surname}
                   onChangeText={(text) => handleChange("surname", text)}
                 />
@@ -307,7 +351,9 @@ export default function NewUserRegistration() {
               <View className="flex-1">
                 <TextInput
                   placeholder="First Name *"
-                  className={`border p-3 rounded-lg text-sm ${errors.firstname ? "border-red-500" : "border-gray-300"}`}
+                  className={`border p-3 rounded-lg text-sm ${
+                    errors.firstname ? "border-red-500" : "border-gray-300"
+                  }`}
                   value={form.firstname}
                   onChangeText={(text) => handleChange("firstname", text)}
                 />
@@ -320,103 +366,87 @@ export default function NewUserRegistration() {
             </View>
 
             <TextInput
-              placeholder="Middle Name (Optional)"
-              className="border border-gray-300 p-3 rounded-lg mb-3 text-sm"
-              value={form.middlename}
-              onChangeText={(text) => handleChange("middlename", text)}
+              placeholder="Phone Number *"
+              className={`border p-3 rounded-lg mb-3 text-sm ${
+                errors.phone ? "border-red-500" : "border-gray-300"
+              }`}
+              keyboardType="phone-pad"
+              value={form.phone}
+              onChangeText={(text) => handleChange("phone", text)}
             />
-
-            {/* Phone Numbers Row */}
-            <View className="flex-row gap-2 mb-3">
-              <View className="flex-1">
-                <TextInput
-                  placeholder="Your Phone *"
-                  className={`border p-3 rounded-lg text-sm ${errors.phone ? "border-red-500" : "border-gray-300"}`}
-                  keyboardType="phone-pad"
-                  value={form.phone}
-                  onChangeText={(text) => handleChange("phone", text)}
-                />
-                {errors.phone && (
-                  <Text className="text-red-500 text-xs mt-1">
-                    {errors.phone}
-                  </Text>
-                )}
-              </View>
-              <View className="flex-1">
-                <TextInput
-                  placeholder="Parent's Phone"
-                  className="border border-gray-300 p-3 rounded-lg text-sm"
-                  keyboardType="phone-pad"
-                  value={form.parentPhone}
-                  onChangeText={(text) => handleChange("parentPhone", text)}
-                />
-              </View>
-            </View>
-
-            {/* Gender and DOB Row */}
-            <View className="flex-row gap-2 mb-3">
-              <View className="flex-1">
-                <Text className="text-sm font-medium mb-1">Gender *</Text>
-                <View className="flex-row gap-2">
-                  {["Male", "Female"].map((gender) => (
-                    <TouchableOpacity
-                      key={gender}
-                      className={`flex-1 p-3 rounded-lg border ${
-                        form.gender === gender
-                          ? "bg-blue-500 border-blue-500"
-                          : "bg-white border-gray-300"
-                      }`}
-                      onPress={() => handleChange("gender", gender)}
-                    >
-                      <Text
-                        className={`text-center text-sm ${
-                          form.gender === gender
-                            ? "text-white"
-                            : "text-gray-600"
-                        }`}
-                      >
-                        {gender}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                {errors.gender && (
-                  <Text className="text-red-500 text-xs mt-1">
-                    {errors.gender}
-                  </Text>
-                )}
-              </View>
-              <View className="flex-1">
-                <TextInput
-                  placeholder="DOB (DD/MM/YYYY) *"
-                  className={`border p-3 rounded-lg text-sm ${errors.dateOfBirth ? "border-red-500" : "border-gray-300"}`}
-                  value={form.dateOfBirth}
-                  onChangeText={(text) => handleChange("dateOfBirth", text)}
-                />
-                {errors.dateOfBirth && (
-                  <Text className="text-red-500 text-xs mt-1">
-                    {errors.dateOfBirth}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {/* Address */}
-            <TextInput
-              placeholder="Home Address *"
-              className={`border p-3 rounded-lg mb-3 text-sm ${errors.address ? "border-red-500" : "border-gray-300"}`}
-              multiline
-              numberOfLines={2}
-              value={form.address}
-              onChangeText={(text) => handleChange("address", text)}
-            />
-            {errors.address && (
-              <Text className="text-red-500 text-xs mb-2">
-                {errors.address}
-              </Text>
+            {errors.phone && (
+              <Text className="text-red-500 text-xs mb-2">{errors.phone}</Text>
             )}
 
-            {/* State and LGA Dropdowns */}
+            {/* Gender Selection */}
+            <View className="mb-3">
+              <Text className="text-sm font-medium mb-2">Gender *</Text>
+              <View className="flex-row gap-2">
+                {["Male", "Female"].map((gender) => (
+                  <TouchableOpacity
+                    key={gender}
+                    className={`flex-1 p-3 rounded-lg border ${
+                      form.gender === gender
+                        ? "bg-blue-500 border-blue-500"
+                        : "bg-white border-gray-300"
+                    }`}
+                    onPress={() =>
+                      handleChange("gender", gender as "Male" | "Female")
+                    }
+                  >
+                    <Text
+                      className={`text-center text-sm ${
+                        form.gender === gender ? "text-white" : "text-gray-600"
+                      }`}
+                    >
+                      {gender}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Address Information */}
+          <View className="mb-6">
+            <Text className="text-lg font-semibold mb-3 text-gray-800 border-b border-gray-200 pb-2">
+              Address Information
+            </Text>
+
+            <View className="flex-row gap-2 mb-3">
+              <View className="flex-2">
+                <TextInput
+                  placeholder="House Number *"
+                  className={`border p-3 rounded-lg text-sm ${
+                    errors.houseNumber ? "border-red-500" : "border-gray-300"
+                  }`}
+                  value={form.houseNumber}
+                  onChangeText={(text) => handleChange("houseNumber", text)}
+                />
+                {errors.houseNumber && (
+                  <Text className="text-red-500 text-xs mt-1">
+                    {errors.houseNumber}
+                  </Text>
+                )}
+              </View>
+              <View className="flex-1">
+                <TextInput
+                  placeholder="Street Address *"
+                  className={`border p-3 rounded-lg text-sm ${
+                    errors.address ? "border-red-500" : "border-gray-300"
+                  }`}
+                  value={form.address}
+                  onChangeText={(text) => handleChange("address", text)}
+                />
+                {errors.address && (
+                  <Text className="text-red-500 text-xs mt-1">
+                    {errors.address}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* State and LGA */}
             <View className="flex-row gap-2 mb-3" style={{ zIndex: 999 }}>
               <View className="flex-1">
                 <Dropdown
@@ -452,318 +482,133 @@ export default function NewUserRegistration() {
                 )}
               </View>
             </View>
-
-            {/* Nationality and Disability Row */}
-            <View className="flex-row gap-2 mb-3">
-              <View className="flex-1">
-                <TextInput
-                  placeholder="Nationality"
-                  className="border border-gray-300 p-3 rounded-lg text-sm"
-                  value={form.nationality}
-                  onChangeText={(text) => handleChange("nationality", text)}
-                />
-              </View>
-              <View className="flex-1">
-                <TextInput
-                  placeholder="Disability (Optional)"
-                  className="border border-gray-300 p-3 rounded-lg text-sm"
-                  value={form.disability}
-                  onChangeText={(text) => handleChange("disability", text)}
-                />
-              </View>
-            </View>
-
-            <View className="mb-3">
-              <Text className="text-sm font-medium mb-2">Passport Photo *</Text>
-              <TouchableOpacity className="border-2 border-dashed border-gray-300 p-4 rounded-lg items-center">
-                <Text className="text-gray-500 text-sm">
-                  Tap to upload photo
-                </Text>
-                <Text className="text-xs text-gray-400 mt-1">
-                  JPG, PNG (Max 2MB)
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
-          {/* Academic Information */}
+          {/* Passport Photo */}
           <View className="mb-6">
             <Text className="text-lg font-semibold mb-3 text-gray-800 border-b border-gray-200 pb-2">
-              🎓 Academic Information
+              Passport Photo
+            </Text>
+            <TouchableOpacity className="border-2 border-dashed border-gray-300 p-6 rounded-lg items-center">
+              <Text className="text-gray-500 text-sm mb-1">
+                Tap to upload photo
+              </Text>
+              <Text className="text-xs text-gray-400">
+                {form.gender === "Male"
+                  ? "Default male image"
+                  : "Default female image"}{" "}
+                will be used if not provided
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Exam Selection */}
+          <View className="mb-6">
+            <Text className="text-lg font-semibold mb-3 text-gray-800 border-b border-gray-200 pb-2">
+              Exam Information
             </Text>
 
-            <TextInput
-              placeholder="Current School Name *"
-              className={`border p-3 rounded-lg mb-3 text-sm ${errors.schoolName ? "border-red-500" : "border-gray-300"}`}
-              value={form.schoolName}
-              onChangeText={(text) => handleChange("schoolName", text)}
-            />
-            {errors.schoolName && (
+            <Text className="text-sm font-medium mb-2">Select Exam Type *</Text>
+            <View className="flex-row gap-2 mb-4">
+              {EXAM_TYPES.map((exam) => (
+                <TouchableOpacity
+                  key={exam}
+                  className={`flex-1 p-3 rounded-lg border ${
+                    form.examType === exam
+                      ? "bg-green-500 border-green-500"
+                      : "bg-white border-gray-300"
+                  }`}
+                  onPress={() => handleChange("examType", exam)}
+                >
+                  <Text
+                    className={`text-center text-sm ${
+                      form.examType === exam ? "text-white" : "text-gray-600"
+                    }`}
+                  >
+                    {exam}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {errors.examType && (
               <Text className="text-red-500 text-xs mb-2">
-                {errors.schoolName}
+                {errors.examType}
               </Text>
             )}
-
-            {/* Class Level and Exam Type Row */}
-            <View className="flex-row gap-2 mb-3">
-              <View className="flex-1">
-                <Text className="text-sm font-medium mb-1">Class/Level *</Text>
-                <View className="flex-row flex-wrap gap-1">
-                  {CLASS_LEVELS.slice(0, 3).map((level) => (
-                    <TouchableOpacity
-                      key={level}
-                      className={`px-3 py-2 rounded-full border ${
-                        form.classLevel === level
-                          ? "bg-blue-500 border-blue-500"
-                          : "bg-white border-gray-300"
-                      }`}
-                      onPress={() => handleChange("classLevel", level)}
-                    >
-                      <Text
-                        className={`text-xs ${
-                          form.classLevel === level
-                            ? "text-white"
-                            : "text-gray-600"
-                        }`}
-                      >
-                        {level}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View className="flex-row flex-wrap gap-1 mt-1">
-                  {CLASS_LEVELS.slice(3).map((level) => (
-                    <TouchableOpacity
-                      key={level}
-                      className={`px-3 py-2 rounded-full border ${
-                        form.classLevel === level
-                          ? "bg-blue-500 border-blue-500"
-                          : "bg-white border-gray-300"
-                      }`}
-                      onPress={() => handleChange("classLevel", level)}
-                    >
-                      <Text
-                        className={`text-xs ${
-                          form.classLevel === level
-                            ? "text-white"
-                            : "text-gray-600"
-                        }`}
-                      >
-                        {level}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                {errors.classLevel && (
-                  <Text className="text-red-500 text-xs mt-1">
-                    {errors.classLevel}
-                  </Text>
-                )}
-              </View>
-              <View className="flex-1">
-                <Text className="text-sm font-medium mb-1">Exam Type *</Text>
-                <View className="flex-row flex-wrap gap-1">
-                  {EXAM_TYPES.slice(0, 2).map((exam) => (
-                    <TouchableOpacity
-                      key={exam}
-                      className={`px-3 py-2 rounded-full border ${
-                        form.examType === exam
-                          ? "bg-green-500 border-green-500"
-                          : "bg-white border-gray-300"
-                      }`}
-                      onPress={() => handleChange("examType", exam)}
-                    >
-                      <Text
-                        className={`text-xs ${
-                          form.examType === exam
-                            ? "text-white"
-                            : "text-gray-600"
-                        }`}
-                      >
-                        {exam}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View className="flex-row flex-wrap gap-1 mt-1">
-                  {EXAM_TYPES.slice(2).map((exam) => (
-                    <TouchableOpacity
-                      key={exam}
-                      className={`px-3 py-2 rounded-full border ${
-                        form.examType === exam
-                          ? "bg-green-500 border-green-500"
-                          : "bg-white border-gray-300"
-                      }`}
-                      onPress={() => handleChange("examType", exam)}
-                    >
-                      <Text
-                        className={`text-xs ${
-                          form.examType === exam
-                            ? "text-white"
-                            : "text-gray-600"
-                        }`}
-                      >
-                        {exam}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                {errors.examType && (
-                  <Text className="text-red-500 text-xs mt-1">
-                    {errors.examType}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            <TextInput
-              placeholder="Previous Exam Number (if any)"
-              className="border border-gray-300 p-3 rounded-lg mb-3 text-sm"
-              value={form.previousExamNumber}
-              onChangeText={(text) => handleChange("previousExamNumber", text)}
-            />
 
             {/* Subject Selection */}
-            {showSubjects && form.examType && (
-              <View className="mb-4">
-                <Text className="font-semibold mb-2 text-sm">
-                  Select Subjects *
-                </Text>
-                <Text className="text-xs text-blue-600 mb-2">
-                  {getRequiredSubjectsText()}
-                </Text>
-                <Text className="text-xs text-gray-600 mb-3">
-                  Selected: {form.subjects.length}/
-                  {form.examType === "JAMB UTME" ? "4" : "9"}
-                </Text>
+            <Text className="text-sm font-medium mb-2">
+              Select Subjects * (Maximum 5)
+            </Text>
+            <Text className="text-xs text-blue-600 mb-2">
+              Selected: {form.subjects.length}/5
+            </Text>
 
-                {form.subjects.length > 0 && (
-                  <View className="flex-row flex-wrap gap-1 mb-3 p-2 bg-blue-50 rounded-lg">
-                    {form.subjects.map((subject) => (
-                      <View
-                        key={subject}
-                        className="bg-blue-500 px-2 py-1 rounded-full"
-                      >
-                        <Text className="text-white text-xs">{subject}</Text>
-                      </View>
-                    ))}
+            {form.subjects.length > 0 && (
+              <View className="flex-row flex-wrap gap-1 mb-3 p-2 bg-blue-50 rounded-lg">
+                {form.subjects.map((subject) => (
+                  <View
+                    key={subject}
+                    className="bg-blue-500 px-2 py-1 rounded-full flex-row items-center"
+                  >
+                    <Text className="text-white text-xs">{subject}</Text>
+                    <TouchableOpacity
+                      onPress={() => handleSubjectToggle(subject)}
+                      className="ml-2 bg-blue-700 rounded-full w-4 h-4 items-center justify-center"
+                    >
+                      <Text className="text-white text-xs">×</Text>
+                    </TouchableOpacity>
                   </View>
-                )}
-
-                <View className="border border-gray-300 rounded-lg max-h-48">
-                  <ScrollView className="p-2">
-                    <View className="flex-row flex-wrap gap-1">
-                      {getAvailableSubjects().map((subject) => (
-                        <TouchableOpacity
-                          key={subject}
-                          className={`px-3 py-2 rounded-full border m-1 ${
-                            form.subjects.includes(subject)
-                              ? "bg-blue-500 border-blue-500"
-                              : "bg-white border-gray-300"
-                          }`}
-                          onPress={() => handleSubjectToggle(subject)}
-                        >
-                          <Text
-                            className={`text-xs ${
-                              form.subjects.includes(subject)
-                                ? "text-white"
-                                : "text-gray-600"
-                            }`}
-                          >
-                            {subject}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
-                </View>
-                {errors.subjects && (
-                  <Text className="text-red-500 text-xs mt-2">
-                    {errors.subjects}
-                  </Text>
-                )}
+                ))}
               </View>
+            )}
+
+            <View className="border border-gray-300 rounded-lg max-h-48">
+              <ScrollView className="p-2">
+                <View className="flex-row flex-wrap gap-1">
+                  {ALL_SUBJECTS.map((subject) => (
+                    <TouchableOpacity
+                      key={subject}
+                      className={`px-3 py-2 rounded-full border m-1 ${
+                        form.subjects.includes(subject)
+                          ? "bg-blue-500 border-blue-500"
+                          : "bg-white border-gray-300"
+                      }`}
+                      onPress={() => handleSubjectToggle(subject)}
+                    >
+                      <Text
+                        className={`text-xs ${
+                          form.subjects.includes(subject)
+                            ? "text-white"
+                            : "text-gray-600"
+                        }`}
+                      >
+                        {subject}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+            {errors.subjects && (
+              <Text className="text-red-500 text-xs mt-2">
+                {errors.subjects}
+              </Text>
             )}
           </View>
 
-          {/* Emergency Contact */}
+          {/* Submit Button */}
           <View className="mb-6">
-            <Text className="text-lg font-semibold mb-3 text-gray-800 border-b border-gray-200 pb-2">
-              🚨 Emergency Contact
-            </Text>
-
-            <View className="flex-row gap-2 mb-3">
-              <View className="flex-2">
-                <TextInput
-                  placeholder="Emergency Contact Name *"
-                  className={`border p-3 rounded-lg text-sm ${errors.emergencyContact ? "border-red-500" : "border-gray-300"}`}
-                  value={form.emergencyContact}
-                  onChangeText={(text) =>
-                    handleChange("emergencyContact", text)
-                  }
-                />
-                {errors.emergencyContact && (
-                  <Text className="text-red-500 text-xs mt-1">
-                    {errors.emergencyContact}
-                  </Text>
-                )}
-              </View>
-              <View className="flex-1">
-                <TextInput
-                  placeholder="Phone *"
-                  className={`border p-3 rounded-lg text-sm ${errors.emergencyPhone ? "border-red-500" : "border-gray-300"}`}
-                  keyboardType="phone-pad"
-                  value={form.emergencyPhone}
-                  onChangeText={(text) => handleChange("emergencyPhone", text)}
-                />
-                {errors.emergencyPhone && (
-                  <Text className="text-red-500 text-xs mt-1">
-                    {errors.emergencyPhone}
-                  </Text>
-                )}
-              </View>
-            </View>
-          </View>
-
-          {/* Summary */}
-          {form.examType && form.subjects.length > 0 && (
-            <View className="bg-green-50 p-3 rounded-lg mb-6">
-              <Text className="font-semibold text-green-800 mb-2 text-sm">
-                Registration Summary
-              </Text>
-              <Text className="text-green-700 text-xs">
-                Name: {form.firstname} {form.surname}
-              </Text>
-              <Text className="text-green-700 text-xs">
-                Exam: {form.examType}
-              </Text>
-              <Text className="text-green-700 text-xs">
-                Subjects: {form.subjects.join(", ")}
-              </Text>
-              <Text className="text-green-700 text-xs">
-                School: {form.schoolName}
-              </Text>
-            </View>
-          )}
-
-          <View className="mb-6">
-            <Text className="text-xs text-gray-600 mb-4 leading-4">
-              By registering, you agree to our Terms of Service and Privacy
-              Policy. Your data will be handled securely according to Fillop
-              Tech Limited's privacy standards.
-            </Text>
-
             <Button
               title={
-                loading ? "Processing Registration..." : "Continue to Payment"
+                loading
+                  ? "Creating Account..."
+                  : "Register & Continue to Payment"
               }
               onPress={handleRegistration}
               className={`${loading ? "bg-gray-400" : "bg-blue-600"} mb-3`}
+              disabled={loading}
             />
-
-            <Text className="text-xs text-center text-gray-500">
-              Need help? Contact support@fillop.com or call +234-XXX-XXX-XXXX
-            </Text>
           </View>
         </View>
       </View>
