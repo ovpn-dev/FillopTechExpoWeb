@@ -1,13 +1,19 @@
-// app/screens/ExamScreen.tsx - Cleaned version without subject switcher
-import React from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+// app/screens/ExamScreen.tsx - Integrated with apiService for questions/answers
+import React, { useEffect, useState } from "react";
+import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
-// Import our new services and types
-import { QuestionService } from "../services/questionService";
-import { ExamConfig } from "../utils/examValidator";
+// Import API service
+import apiService from "../../services/apiService";
+import { ExamConfig } from "../../utils/examValidator";
+
+// Extended interface to include API IDs
+interface ExtendedExamConfig extends ExamConfig {
+  paperId: string;
+  attemptId: string;
+}
 
 interface ExamScreenProps {
-  examConfig: ExamConfig;
+  examConfig: ExtendedExamConfig;
   currentSubject: string;
   onSubjectChange: (subject: string) => void;
   currentQuestionInSubject: number;
@@ -15,6 +21,22 @@ interface ExamScreenProps {
   userAnswers: { [questionId: string]: string };
   onAnswerChange: (answers: { [questionId: string]: string }) => void;
   examStartTime: number | null;
+  onExamComplete?: (results: any) => void; // New prop for handling exam completion
+}
+
+// API Question interface
+interface ApiQuestion {
+  id: string;
+  text: string;
+  type: string;
+  topic_id: string;
+  options: ApiOption[];
+}
+
+interface ApiOption {
+  id: string;
+  text: string;
+  is_correct: boolean;
 }
 
 export default function ExamScreen({
@@ -26,30 +48,144 @@ export default function ExamScreen({
   userAnswers,
   onAnswerChange,
   examStartTime,
+  onExamComplete,
 }: ExamScreenProps) {
-  // Use QuestionService to generate questions
-  const currentSubjectQuestions = QuestionService.generateQuestionsForSubject(
-    currentSubject,
-    examConfig.numberOfQuestions || 40
-  );
+  const [questions, setQuestions] = useState<ApiQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [topics, setTopics] = useState<{ [key: string]: string }>({}); // Map topic names to IDs
 
-  const currentQuestion = currentSubjectQuestions[currentQuestionInSubject];
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
 
-  // Get navigation info using QuestionService
-  const navigationInfo = QuestionService.getQuestionNavigation(
-    examConfig.subjects,
-    currentSubject,
-    currentQuestionInSubject,
-    examConfig.numberOfQuestions || 40
-  );
+  useEffect(() => {
+    if (Object.keys(topics).length > 0) {
+      fetchQuestions();
+    }
+  }, [currentSubject, topics]);
 
-  const handleAnswerSelect = (answer: string) => {
-    const newAnswers = { ...userAnswers, [currentQuestion.id]: answer };
-    onAnswerChange(newAnswers);
+  const fetchInitialData = async () => {
+    try {
+      // Fetch topics to map subject names to topic IDs
+      const topicsResponse = await apiService.getTopics();
+      const typedTopicsResponse = topicsResponse as Array<{
+        id: string;
+        name: string;
+      }>;
+      const topicsMap = typedTopicsResponse.reduce((acc: any, topic: any) => {
+        acc[topic.name] = topic.id;
+        return acc;
+      }, {});
+      setTopics(topicsMap);
+    } catch (err) {
+      console.error("Failed to fetch topics:", err);
+      Alert.alert("Error", "Failed to load exam data");
+    }
   };
 
+  const fetchQuestions = async () => {
+    try {
+      setLoading(true);
+      const currentSubjectId = topics[currentSubject];
+
+      if (!currentSubjectId) {
+        console.warn(`No topic ID found for subject: ${currentSubject}`);
+        setQuestions([]);
+        return;
+      }
+
+      // Fetch questions for the current subject/topic
+      const response = await apiService.getQuestions({
+        examPaperId: examConfig.paperId,
+        type: "MCQ_SINGLE",
+      });
+
+      // Cast response to ApiQuestion[] before filtering
+      const filteredQuestions = (response as ApiQuestion[]).filter(
+        (q) => q.topic_id === currentSubjectId
+      );
+
+      setQuestions(filteredQuestions);
+    } catch (err) {
+      console.error("Failed to fetch questions:", err);
+      Alert.alert("Error", "Failed to load questions");
+      setQuestions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAnswerSelect = async (optionKey: string) => {
+    if (!currentQuestion) return;
+
+    const selectedOption =
+      currentQuestion.options[optionKey.charCodeAt(0) - 65];
+    if (!selectedOption) return;
+
+    // Update local state first for immediate UI feedback
+    const newAnswers = { ...userAnswers, [currentQuestion.id]: optionKey };
+    onAnswerChange(newAnswers);
+
+    try {
+      // Submit answer to API
+      await apiService.submitAnswers(examConfig.attemptId, {
+        answers: [
+          {
+            question_id: currentQuestion.id,
+            selected_option_ids: [selectedOption.id],
+          },
+        ],
+      });
+    } catch (err) {
+      console.error("Failed to submit answer:", err);
+      // Don't show alert for individual answer submissions to avoid disrupting exam flow
+      // The answer is still saved locally and can be resubmitted later
+    }
+  };
+
+  const handleSubmitExam = async () => {
+    Alert.alert(
+      "Submit Exam",
+      "Are you sure you want to submit your exam? This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Submit",
+          style: "destructive",
+          onPress: performSubmitExam,
+        },
+      ]
+    );
+  };
+
+  const performSubmitExam = async () => {
+    try {
+      setSubmitting(true);
+      const results = await apiService.completeAttempt(examConfig.attemptId);
+
+      if (onExamComplete) {
+        onExamComplete(results);
+      } else {
+        Alert.alert(
+          "Exam Completed",
+          "Your exam has been submitted successfully!"
+        );
+      }
+    } catch (err) {
+      console.error("Failed to complete exam:", err);
+      Alert.alert("Error", "Failed to submit exam. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Navigation logic
   const goToNext = () => {
-    const questionsPerSubject = examConfig.numberOfQuestions || 40;
+    const questionsPerSubject = questions.length;
 
     if (currentQuestionInSubject < questionsPerSubject - 1) {
       // Move to next question in current subject
@@ -66,8 +202,6 @@ export default function ExamScreen({
   };
 
   const goToPrevious = () => {
-    const questionsPerSubject = examConfig.numberOfQuestions || 40;
-
     if (currentQuestionInSubject > 0) {
       // Move to previous question in current subject
       onQuestionChange(currentQuestionInSubject - 1);
@@ -77,7 +211,8 @@ export default function ExamScreen({
       if (currentSubjectIndex > 0) {
         const previousSubject = examConfig.subjects[currentSubjectIndex - 1];
         onSubjectChange(previousSubject);
-        onQuestionChange(questionsPerSubject - 1); // Go to last question of previous subject
+        // We'll need to wait for questions to load, so set to 0 for now
+        onQuestionChange(0);
       }
     }
   };
@@ -86,17 +221,56 @@ export default function ExamScreen({
     onQuestionChange(questionIndex);
   };
 
-  const getAnsweredQuestionsInSubject = (subject: string) => {
-    const allQuestions = QuestionService.generateQuestionsForSubject(
-      subject,
-      examConfig.numberOfQuestions || 40
-    );
-    return QuestionService.getAnsweredQuestionsInSubject(
-      allQuestions,
-      subject,
-      userAnswers
-    );
+  const getAnsweredQuestionsInSubject = () => {
+    return questions.filter((q) => userAnswers[q.id]).length;
   };
+
+  // Navigation info
+  const currentQuestion = questions[currentQuestionInSubject];
+  const isFirstQuestion =
+    examConfig.subjects.indexOf(currentSubject) === 0 &&
+    currentQuestionInSubject === 0;
+  const isLastQuestion =
+    examConfig.subjects.indexOf(currentSubject) ===
+      examConfig.subjects.length - 1 &&
+    currentQuestionInSubject === questions.length - 1;
+
+  // Loading state
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center p-6">
+        <Text className="text-lg text-gray-600 mb-4">Loading questions...</Text>
+        <Text className="text-sm text-gray-500">Subject: {currentSubject}</Text>
+      </View>
+    );
+  }
+
+  // No questions available
+  if (questions.length === 0) {
+    return (
+      <View className="flex-1 justify-center items-center p-6">
+        <Text className="text-lg text-red-600 mb-4">
+          No questions available
+        </Text>
+        <Text className="text-sm text-gray-500 text-center">
+          No questions found for {currentSubject}. Please check your exam
+          configuration.
+        </Text>
+      </View>
+    );
+  }
+
+  // Current question not available
+  if (!currentQuestion) {
+    return (
+      <View className="flex-1 justify-center items-center p-6">
+        <Text className="text-lg text-red-600 mb-4">Question not found</Text>
+        <Text className="text-sm text-gray-500">
+          Question index: {currentQuestionInSubject}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView>
@@ -110,12 +284,11 @@ export default function ExamScreen({
             {currentSubject}
           </Text>
           <Text className="text-lg">
-            Question {navigationInfo.currentQuestionNumber} of{" "}
-            {navigationInfo.totalQuestionsInSubject}
+            Question {currentQuestionInSubject + 1} of {questions.length}
           </Text>
           <Text className="text-sm text-gray-600">
-            Progress: {getAnsweredQuestionsInSubject(currentSubject)} of{" "}
-            {examConfig.numberOfQuestions || 40} answered
+            Progress: {getAnsweredQuestionsInSubject()} of {questions.length}{" "}
+            answered
           </Text>
         </View>
 
@@ -139,7 +312,7 @@ export default function ExamScreen({
 
               return (
                 <TouchableOpacity
-                  key={optionKey}
+                  key={option.id}
                   onPress={() => handleAnswerSelect(optionKey)}
                   className="flex-row items-center space-x-3 p-3 border border-gray-300 rounded-lg"
                   style={{ marginBottom: 12 }}
@@ -175,7 +348,7 @@ export default function ExamScreen({
                     className="text-base flex-1"
                     style={{ flex: 1, marginLeft: 12 }}
                   >
-                    ({optionKey}) {option}
+                    ({optionKey}) {option.text}
                   </Text>
                 </TouchableOpacity>
               );
@@ -190,13 +363,13 @@ export default function ExamScreen({
             className="flex-row flex-wrap gap-1"
             style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}
           >
-            {currentSubjectQuestions.map((_, index) => {
-              const isAnswered = userAnswers[currentSubjectQuestions[index].id];
+            {questions.map((question, index) => {
+              const isAnswered = userAnswers[question.id];
               const isCurrent = index === currentQuestionInSubject;
 
               return (
                 <TouchableOpacity
-                  key={index}
+                  key={question.id}
                   onPress={() => handleQuestionNavigation(index)}
                   className={`w-8 h-8 rounded items-center justify-center ${
                     isCurrent
@@ -230,9 +403,9 @@ export default function ExamScreen({
           </Text>
         </View>
 
-        {/* Navigation Buttons */}
+        {/* Navigation and Submit Buttons */}
         <View
-          className="flex-row justify-between"
+          className="flex-row justify-between mb-4"
           style={{
             flexDirection: "row",
             justifyContent: "space-between",
@@ -241,14 +414,14 @@ export default function ExamScreen({
         >
           <TouchableOpacity
             onPress={goToPrevious}
-            disabled={navigationInfo.isFirstQuestion}
+            disabled={isFirstQuestion}
             className={`px-6 py-3 rounded-lg ${
-              navigationInfo.isFirstQuestion ? "bg-gray-300" : "bg-blue-600"
+              isFirstQuestion ? "bg-gray-300" : "bg-blue-600"
             }`}
           >
             <Text
               className={`font-bold ${
-                navigationInfo.isFirstQuestion ? "text-gray-500" : "text-white"
+                isFirstQuestion ? "text-gray-500" : "text-white"
               }`}
             >
               PREVIOUS
@@ -257,19 +430,54 @@ export default function ExamScreen({
 
           <TouchableOpacity
             onPress={goToNext}
-            disabled={navigationInfo.isLastQuestion}
+            disabled={isLastQuestion}
             className={`px-6 py-3 rounded-lg ${
-              navigationInfo.isLastQuestion ? "bg-gray-300" : "bg-blue-600"
+              isLastQuestion ? "bg-gray-300" : "bg-blue-600"
             }`}
           >
             <Text
               className={`font-bold ${
-                navigationInfo.isLastQuestion ? "text-gray-500" : "text-white"
+                isLastQuestion ? "text-gray-500" : "text-white"
               }`}
             >
               NEXT
             </Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Submit Exam Button */}
+        <TouchableOpacity
+          onPress={handleSubmitExam}
+          disabled={submitting}
+          className={`py-4 px-6 rounded-lg ${
+            submitting ? "bg-gray-400" : "bg-red-600"
+          }`}
+          style={{ flexShrink: 0 }}
+        >
+          <Text className="text-white font-bold text-center text-lg">
+            {submitting ? "SUBMITTING..." : "SUBMIT EXAM"}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Exam Progress Summary */}
+        <View
+          className="mt-4 p-4 bg-gray-50 rounded-lg"
+          style={{ flexShrink: 0 }}
+        >
+          <Text className="font-bold text-gray-800 mb-2">📊 Exam Progress</Text>
+          <Text className="text-sm text-gray-600">
+            Total Questions:{" "}
+            {examConfig.subjects.reduce((total, subject) => {
+              return total + (questions.length > 0 ? questions.length : 0);
+            }, 0)}
+          </Text>
+          <Text className="text-sm text-gray-600">
+            Answered: {Object.keys(userAnswers).length}
+          </Text>
+          <Text className="text-sm text-gray-600">
+            Current Subject: {currentSubject} ({getAnsweredQuestionsInSubject()}
+            /{questions.length})
+          </Text>
         </View>
       </View>
     </ScrollView>

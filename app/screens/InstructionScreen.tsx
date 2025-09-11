@@ -3,8 +3,8 @@ import React from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 // Import our new types and utilities
-import { getModeConfig, shouldUseTimer } from "../data/examTypes";
-import { ExamConfig } from "../utils/examValidator";
+import { getModeConfig, shouldUseTimer } from "../../data/examTypes";
+import { ExamConfig } from "../../utils/examValidator";
 
 interface InstructionScreenProps {
   examConfig: ExamConfig;

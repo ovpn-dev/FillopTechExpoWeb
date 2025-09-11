@@ -9,13 +9,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Button from "../../components/Button";
+import Dropdown from "../../components/Dropdown";
 import {
   NIGERIAN_STATES,
   NIGERIAN_STATES_AND_LGAS,
-} from "../data/nigerianStatesAndLGAs";
-import apiService, { ApiError } from "../services/apiService";
-import Button from "./../components/Button";
-import Dropdown from "./../components/Dropdown";
+} from "../../data/nigerianStatesAndLGAs";
+import apiService, { ApiError } from "../../services/apiService";
 
 const SUBSCRIPTION_PLANS = [
   { id: "5", name: "5 Students Plan", price: 15000, duration: "1 Year" },

@@ -9,15 +9,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Button from "../../components/Button";
+import Dropdown from "../../components/Dropdown";
 import {
   NIGERIAN_STATES,
   NIGERIAN_STATES_AND_LGAS,
-} from "../data/nigerianStatesAndLGAs";
-import { ALL_SUBJECTS } from "../data/subjects";
-import apiService, { ApiError } from "../services/apiService";
-import { PricingCalculator } from "../utils/pricingCalculator";
-import Button from "./../components/Button";
-import Dropdown from "./../components/Dropdown";
+} from "../../data/nigerianStatesAndLGAs";
+import { ALL_SUBJECTS } from "../../data/subjects";
+import apiService, { ApiError, ApiService } from "../../services/apiService";
+import { PricingCalculator } from "../../utils/pricingCalculator";
 
 const EXAM_TYPES = ["JAMB", "WAEC", "NECO"];
 
@@ -165,17 +165,20 @@ export default function NewUserRegistration() {
 
     try {
       // Generate username from name
-      const username = apiService.generateUsername(
-        form.surname,
-        form.firstname
-      );
+      const username =
+        typeof ApiService.generateUsername === "function"
+          ? ApiService.generateUsername(form.surname, form.firstname)
+          : (form.surname + form.firstname).toLowerCase();
 
       // Prepare registration data for API
       const registrationData = {
-        username,
         email: form.email,
         password: form.password,
-        role: "student" as const,
+        first_name: form.firstname,
+        last_name: form.surname,
+        address: form.address,
+        state: form.state,
+        LGA: form.lga,
       };
 
       // Call registration API

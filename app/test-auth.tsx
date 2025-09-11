@@ -1,43 +1,82 @@
 import React, { useState } from "react";
-import { Alert, Button, ScrollView, Text, TextInput, View } from "react-native";
-import apiService, { TokenStorage } from "../app/services/apiService";
+import {
+  Alert,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import apiService, { TokenStorage } from "../services/apiService";
 
 export default function TestAuth() {
-  const [username, setUsername] = useState("johndoe");
   const [email, setEmail] = useState("john@example.com");
   const [password, setPassword] = useState("password123");
-  const [role, setRole] = useState<"student" | "corporate">("student");
+  const [firstName, setFirstName] = useState("John");
+  const [lastName, setLastName] = useState("Doe");
+  const [address, setAddress] = useState("123 Main St");
+  const [stateVal, setStateVal] = useState("Lagos");
+  const [lga, setLga] = useState("Ikeja");
   const [user, setUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const validateInputs = () => {
+    if (!email.includes("@") || password.length < 6) {
+      Alert.alert("Invalid Input", "Check email and password (min 6 chars).");
+      return false;
+    }
+    if (!firstName || !lastName || !address || !stateVal || !lga) {
+      Alert.alert("Missing fields", "Fill in all required fields.");
+      return false;
+    }
+    return true;
+  };
 
   const handleRegister = async () => {
+    if (!validateInputs()) return;
+    setIsLoading(true);
     try {
       const res = await apiService.register({
-        username,
         email,
         password,
-        role,
+        first_name: firstName,
+        last_name: lastName,
+        address,
+        state: stateVal,
+        LGA: lga,
       });
       await TokenStorage.setToken(res.token);
-      Alert.alert("Register Success", `User: ${res.user.username}`);
-      setUser(res.user);
+      Alert.alert("Register Success", `User registered successfully`);
     } catch (err: any) {
-      console.error("Register error:", err);
       Alert.alert("Error", err.message || "Register failed");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleLogin = async () => {
+    setIsLoading(true);
     try {
       const res = await apiService.login({ email, password });
       await TokenStorage.setToken(res.token);
-      Alert.alert("Login Success", `Token: ${res.token.substring(0, 20)}...`);
+      Alert.alert("Login Success", `Token stored.`);
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Login failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  const handleGetMe = async () => {
+    setIsLoading(true);
+    try {
       const me = await apiService.getMe();
       setUser(me);
       Alert.alert("User Info", JSON.stringify(me, null, 2));
     } catch (err: any) {
-      console.error("Login error:", err);
-      Alert.alert("Error", err.message || "Login failed");
+      Alert.alert("Error", err.message || "GetMe failed");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -49,35 +88,78 @@ export default function TestAuth() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: 20 }}>
-      <Text>Username:</Text>
-      <TextInput
-        value={username}
-        onChangeText={setUsername}
-        autoCapitalize="none"
-        style={{ borderWidth: 1, marginBottom: 10, padding: 5 }}
-      />
-
       <Text>Email:</Text>
-      <TextInput
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        style={{ borderWidth: 1, marginBottom: 10, padding: 5 }}
-      />
+      <TextInput value={email} onChangeText={setEmail} style={styles.input} />
 
       <Text>Password:</Text>
       <TextInput
         value={password}
         onChangeText={setPassword}
         secureTextEntry
-        style={{ borderWidth: 1, marginBottom: 10, padding: 5 }}
+        style={styles.input}
       />
 
-      <Button title="Register" onPress={handleRegister} />
-      <View style={{ height: 10 }} />
-      <Button title="Login & Get Me" onPress={handleLogin} />
-      <View style={{ height: 10 }} />
-      <Button title="Logout" onPress={handleLogout} color="red" />
+      <Text>First Name:</Text>
+      <TextInput
+        value={firstName}
+        onChangeText={setFirstName}
+        style={styles.input}
+      />
+
+      <Text>Last Name:</Text>
+      <TextInput
+        value={lastName}
+        onChangeText={setLastName}
+        style={styles.input}
+      />
+
+      <Text>Address:</Text>
+      <TextInput
+        value={address}
+        onChangeText={setAddress}
+        style={styles.input}
+      />
+
+      <Text>State:</Text>
+      <TextInput
+        value={stateVal}
+        onChangeText={setStateVal}
+        style={styles.input}
+      />
+
+      <Text>LGA:</Text>
+      <TextInput value={lga} onChangeText={setLga} style={styles.input} />
+
+      <TouchableOpacity
+        onPress={handleRegister}
+        disabled={isLoading}
+        style={[styles.btn, { backgroundColor: "green" }]}
+      >
+        <Text style={styles.btnText}>Register</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={handleLogin}
+        disabled={isLoading}
+        style={[styles.btn, { backgroundColor: "blue" }]}
+      >
+        <Text style={styles.btnText}>Login</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={handleGetMe}
+        disabled={isLoading}
+        style={[styles.btn, { backgroundColor: "orange" }]}
+      >
+        <Text style={styles.btnText}>Get Me</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={handleLogout}
+        style={[styles.btn, { backgroundColor: "red" }]}
+      >
+        <Text style={styles.btnText}>Logout</Text>
+      </TouchableOpacity>
 
       {user && (
         <View style={{ marginTop: 20 }}>
@@ -88,3 +170,9 @@ export default function TestAuth() {
     </ScrollView>
   );
 }
+
+const styles = {
+  input: { borderWidth: 1, marginBottom: 10, padding: 5 },
+  btn: { padding: 10, marginBottom: 10 },
+  btnText: { color: "white", textAlign: "center" },
+};

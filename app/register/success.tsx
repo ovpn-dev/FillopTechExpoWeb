@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Button from "../components/Button";
+import Button from "../../components/Button";
 
 interface SuccessProps {
   // In real app, these would come from navigation params or context

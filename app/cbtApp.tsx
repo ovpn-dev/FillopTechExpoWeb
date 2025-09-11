@@ -4,8 +4,8 @@ import React, { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
 // Import components
-import Sidebar from "./components/Sidebar";
-import TopBar from "./components/TopBar";
+import Sidebar from "../components/Sidebar";
+import TopBar from "../components/TopBar";
 
 // Import screens
 import Dashboard from "./screens/Dashboard";
@@ -14,12 +14,12 @@ import InstructionScreen from "./screens/InstructionScreen";
 import ResultScreen from "./screens/ResultScreen";
 
 // Import contexts and services
-import { useAuth } from "./contexts/AuthContext";
-import { shouldUseTimer } from "./data/examTypes";
-import { ScoreCalculator } from "./utils/scoreCalculator";
+import { useAuth } from "../contexts/AuthContext";
+import { shouldUseTimer } from "../data/examTypes";
+import { ScoreCalculator } from "../utils/scoreCalculator";
 
 // Import types
-import { AppScreen, ExamConfig, ExamResults } from "./types";
+import { AppScreen, ExamConfig, ExamResults } from "../types";
 
 // Main CBT App Component (wrapped with auth)
 const CBTAppContent: React.FC = () => {

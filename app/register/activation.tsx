@@ -9,8 +9,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Button from "../components/Button";
-import { SystemIdGenerator } from "../utils/systemIdGenerator";
+import Button from "../../components/Button";
+import { SystemIdGenerator } from "../../utils/systemIdGenerator";
 
 const CONTACT_INFO = {
   whatsapp: "08026414352",

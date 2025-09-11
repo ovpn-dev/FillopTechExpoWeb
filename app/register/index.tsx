@@ -1,7 +1,7 @@
 // app/register/index.tsx - Updated to match document requirements exactly
 import { useRouter } from "expo-router";
 import { Text, View } from "react-native";
-import Button from "./../components/Button";
+import Button from "../../components/Button";
 
 export default function RegisterTypeScreen() {
   const router = useRouter();

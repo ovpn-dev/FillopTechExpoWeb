@@ -11,9 +11,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Button from "../components/Button";
-import { PricingCalculator } from "../utils/pricingCalculator";
-import { SystemIdGenerator } from "../utils/systemIdGenerator";
+import Button from "../../components/Button";
+import { PricingCalculator } from "../../utils/pricingCalculator";
+import { SystemIdGenerator } from "../../utils/systemIdGenerator";
 
 // Bank details for payment
 const BANK_DETAILS = {

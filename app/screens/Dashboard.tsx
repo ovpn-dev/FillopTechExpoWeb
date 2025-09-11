@@ -1,5 +1,5 @@
-// screens/Dashboard.tsx - Refactored to use extracted constants and services
-import React, { useState } from "react";
+// screens/Dashboard.tsx - Integrated with apiService for exam types/papers/attempts
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -9,37 +9,101 @@ import {
   View,
 } from "react-native";
 
-// Import our new constants and services
+// Import API service
+import apiService from "../../services/apiService";
+
+// Import utilities and components
+import Button from "../../components/Button";
+import Dropdown from "../../components/Dropdown";
+import { ExamConfig, ExamValidator } from "../../utils/examValidator";
+import { formatTwoDigits } from "../../utils/timeFormatter";
+
+// Import constants (we'll keep some for fallback/validation)
 import {
   EXAM_MODES,
-  EXAM_TYPES,
   ExamMode,
-  ExamType,
-  getExamTypeConfig,
   QUESTION_SOURCES,
   shouldUseTimer,
-} from "../data/examTypes";
-import { ALL_SUBJECTS } from "../data/subjects";
-import { ExamConfig, ExamValidator } from "../utils/examValidator";
-import { formatTwoDigits } from "../utils/timeFormatter";
+} from "../../data/examTypes";
 
-// Import existing components
-import Button from "../components/Button";
-import Dropdown from "../components/Dropdown";
+// Extended interface to include API IDs
+interface ExtendedExamConfig extends ExamConfig {
+  paperId: string;
+  attemptId: string;
+}
 
 interface DashboardProps {
-  onStartExam: (config: ExamConfig) => void;
+  onStartExam: (config: ExtendedExamConfig) => void;
+}
+
+// Dynamic exam type interface
+interface ApiExamType {
+  key: string;
+  label: string;
+  description: string;
+  maxSubjects: number;
+  questionsPerSubject: number;
+  defaultDuration: { minutes: number; seconds: number };
+}
+
+// Dynamic topic interface
+interface ApiTopic {
+  id: string;
+  name: string;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
   const [mode, setMode] = useState<ExamMode | null>(null);
-  const [examType, setExamType] = useState<ExamType | null>(null);
+  const [examType, setExamType] = useState<string | null>(null);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [source, setSource] = useState<string>("");
   const [minutes, setMinutes] = useState(0);
   const [seconds, setSeconds] = useState(0);
 
-  const handleSubmit = () => {
+  // API-driven state
+  const [examTypes, setExamTypes] = useState<ApiExamType[]>([]);
+  const [topics, setTopics] = useState<ApiTopic[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchExamData();
+  }, []);
+
+  const fetchExamData = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch exam types from API
+      const typesResponse = await apiService.getExamTypes();
+      const formattedTypes = typesResponse.map((t: any) => ({
+        key: t.id,
+        label: t.name,
+        description: t.description || "",
+        maxSubjects: t.max_subjects || 4,
+        questionsPerSubject: t.questions_per_subject || 40,
+        defaultDuration: {
+          minutes: t.duration_minutes || 120,
+          seconds: 0,
+        },
+      }));
+      setExamTypes(formattedTypes);
+
+      // Fetch topics/subjects from API
+      const topicsResponse = await apiService.getTopics();
+      const formattedTopics = topicsResponse.map((topic: any) => ({
+        id: topic.id,
+        name: topic.name,
+      }));
+      setTopics(formattedTopics);
+    } catch (err) {
+      console.error("Failed to load exam data:", err);
+      Alert.alert("Error", "Failed to load exam data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
     const examConfig: Partial<ExamConfig> = {
       mode: mode ?? undefined,
       examType: examType ?? undefined,
@@ -57,22 +121,75 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
       return;
     }
 
-    onStartExam(examConfig as ExamConfig);
+    try {
+      // Map selected exam type to API ID
+      const selectedExamType = examTypes.find((t) => t.label === examType);
+      if (!selectedExamType) {
+        Alert.alert("Error", "Invalid exam type selected");
+        return;
+      }
+
+      // Map selected subjects to topic IDs
+      const topicIds = subjects
+        .map((subjectName) => topics.find((t) => t.name === subjectName)?.id)
+        .filter(Boolean) as string[];
+
+      if (topicIds.length === 0) {
+        Alert.alert("Error", "No valid subjects selected");
+        return;
+      }
+
+      // For multi-subject exams, we'll create one paper with the first topic
+      // TODO: Enhance this to handle multiple subjects properly based on your API design
+      const paperRequest = {
+        title: `${examType} - ${source} - ${subjects.join(", ")}`,
+        exam_id: selectedExamType.key,
+        topic_id: topicIds[0], // Using first topic for now
+        duration_minutes: minutes + seconds / 60,
+        // Add any other required fields based on your API
+      };
+
+      // Create exam paper
+      const paper = await apiService.createExamPaper(paperRequest);
+
+      // Start attempt
+      const attempt = await apiService.startAttempt({
+        exam_paper_id: paper.id,
+      });
+
+      // Start exam with extended config
+      const extendedConfig: ExtendedExamConfig = {
+        ...(examConfig as ExamConfig),
+        paperId: paper.id,
+        attemptId: attempt.id,
+      };
+
+      onStartExam(extendedConfig);
+    } catch (err: any) {
+      console.error("Failed to start exam:", err);
+      Alert.alert(
+        "Error",
+        err.message || "Failed to start exam. Please try again."
+      );
+    }
   };
 
   const toggleSubject = (subject: string) => {
     if (!examType) return;
 
+    const selectedExamType = examTypes.find((t) => t.label === examType);
+    if (!selectedExamType) return;
+
     if (subjects.includes(subject)) {
       setSubjects((prev) => prev.filter((s) => s !== subject));
     } else {
-      const validation = ExamValidator.canAddSubject(
-        subjects,
-        examType,
-        subject
-      );
-      if (!validation.isValid) {
-        Alert.alert("Subject Limit", validation.errors[0], [{ text: "OK" }]);
+      // Use API-driven max subjects limit
+      if (subjects.length >= selectedExamType.maxSubjects) {
+        Alert.alert(
+          "Subject Limit",
+          `You can only select up to ${selectedExamType.maxSubjects} subjects for ${examType}.`,
+          [{ text: "OK" }]
+        );
         return;
       }
       setSubjects((prev) => [...prev, subject]);
@@ -107,15 +224,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
     }
   };
 
-  const handleExamTypeChange = (type: ExamType) => {
-    setExamType(type);
+  const handleExamTypeChange = (typeName: string) => {
+    setExamType(typeName);
     setSource(""); // Reset source when exam type changes
     setSubjects([]);
 
-    const typeConfig = getExamTypeConfig(type);
-    if (mode && shouldUseTimer(mode) && typeConfig) {
-      setMinutes(typeConfig.defaultDuration.minutes);
-      setSeconds(typeConfig.defaultDuration.seconds);
+    const selectedType = examTypes.find((t) => t.label === typeName);
+    if (mode && shouldUseTimer(mode) && selectedType) {
+      setMinutes(selectedType.defaultDuration.minutes);
+      setSeconds(selectedType.defaultDuration.seconds);
     } else {
       setMinutes(0);
       setSeconds(0);
@@ -129,12 +246,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
       setMinutes(0);
       setSeconds(0);
     } else if (examType) {
-      handleExamTypeChange(examType);
+      const selectedType = examTypes.find((t) => t.label === examType);
+      if (selectedType) {
+        setMinutes(selectedType.defaultDuration.minutes);
+        setSeconds(selectedType.defaultDuration.seconds);
+      }
     }
   };
 
-  // Get available sources based on selected exam type
-  const availableSources = examType ? QUESTION_SOURCES[examType] : [];
+  // Get available sources based on selected exam type (fallback to static data)
+  const availableSources = examType
+    ? QUESTION_SOURCES[examType as keyof typeof QUESTION_SOURCES] || []
+    : [];
 
   const isFormComplete = () => {
     const config: Partial<ExamConfig> = {
@@ -146,6 +269,28 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
     };
     return ExamValidator.isFormComplete(config);
   };
+
+  const getSubjectValidationMessage = (
+    selectedSubjects: string[],
+    examTypeName: string
+  ) => {
+    const selectedType = examTypes.find((t) => t.label === examTypeName);
+    if (!selectedType) return "";
+
+    const remaining = selectedType.maxSubjects - selectedSubjects.length;
+    if (remaining > 0) {
+      return `Select ${remaining} more subject${remaining === 1 ? "" : "s"} (${selectedSubjects.length}/${selectedType.maxSubjects})`;
+    }
+    return `Maximum subjects selected (${selectedSubjects.length}/${selectedType.maxSubjects})`;
+  };
+
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center">
+        <Text className="text-lg text-gray-600">Loading exam data...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView className="flex-1 p-6">
@@ -177,23 +322,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
         ))}
       </View>
 
-      {/* Exam Type */}
+      {/* Exam Type - Now using API data */}
       <Text className="text-red-600 mb-3 font-bold text-lg">
         SELECT EXAMINATION TYPE:
       </Text>
       <View className="flex-row gap-8 mb-8 flex-wrap">
-        {EXAM_TYPES.map((type) => (
+        {examTypes.map((type) => (
           <TouchableOpacity
             key={type.key}
             className="flex-row items-center gap-3 mb-2"
-            onPress={() => handleExamTypeChange(type.key)}
+            onPress={() => handleExamTypeChange(type.label)}
           >
             <View
               className={`w-6 h-6 rounded-full border-2 border-black items-center justify-center ${
-                examType === type.key ? "bg-red-600" : "bg-white"
+                examType === type.label ? "bg-red-600" : "bg-white"
               }`}
             >
-              {examType === type.key && (
+              {examType === type.label && (
                 <View className="w-3 h-3 rounded-full bg-white" />
               )}
             </View>
@@ -206,24 +351,24 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
       </View>
 
       <View className="flex-row w-full">
-        {/* Subject Selection */}
+        {/* Subject Selection - Now using API data */}
         <View className="mb-8 w-[70%]">
           <Text className="font-bold mb-2 text-lg">CHOOSE SUBJECT(S)</Text>
           {examType && (
             <Text className="text-sm text-blue-600 mb-3">
-              {ExamValidator.getSubjectValidationMessage(subjects, examType)}
+              {getSubjectValidationMessage(subjects, examType)}
             </Text>
           )}
           <View className="flex-row flex-wrap gap-3">
-            {ALL_SUBJECTS.map((subj) => {
-              const isSelected = subjects.includes(subj);
+            {topics.map((topic) => {
+              const isSelected = subjects.includes(topic.name);
               return (
                 <View
-                  key={subj}
+                  key={topic.id}
                   className="flex-row items-center gap-2 mb-2 w-full max-w-xs"
                 >
                   <TouchableOpacity
-                    onPress={() => toggleSubject(subj)}
+                    onPress={() => toggleSubject(topic.name)}
                     className={`w-5 h-5 border-2 border-black items-center justify-center ${
                       isSelected ? "bg-black" : "bg-white"
                     }`}
@@ -232,7 +377,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartExam }) => {
                       <Text className="text-white text-xs font-bold">✓</Text>
                     )}
                   </TouchableOpacity>
-                  <Text className="text-base flex-1">{subj}</Text>
+                  <Text className="text-base flex-1">{topic.name}</Text>
                 </View>
               );
             })}
