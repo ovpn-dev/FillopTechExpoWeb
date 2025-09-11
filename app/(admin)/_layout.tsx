@@ -1,4 +1,4 @@
-// app/(admin)/_layout.tsx - Testing version with auth bypass
+// app/(admin)/_layout.tsx
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Text, View } from "react-native";
@@ -47,8 +47,8 @@ export default function AdminLayout() {
   return (
     <Stack>
       <Stack.Screen name="dashboard" options={{ title: "Admin Dashboard" }} />
-      <Stack.Screen name="exams/index" options={{ title: "Manage Exams" }} />
-      <Stack.Screen name="exams/[id]" options={{ title: "Edit Exam" }} />
+
+      {/* Exam Types Management */}
       <Stack.Screen
         name="exam-types/index"
         options={{ title: "Manage Exam Types" }}
@@ -57,6 +57,15 @@ export default function AdminLayout() {
         name="exam-types/[id]"
         options={{ title: "Edit Exam Type" }}
       />
+
+      {/* Exam Papers Management */}
+      <Stack.Screen
+        name="exams/index"
+        options={{ title: "Manage Exam Papers" }}
+      />
+      <Stack.Screen name="exams/[id]" options={{ title: "Edit Exam Paper" }} />
+
+      {/* Questions Management */}
       <Stack.Screen
         name="questions/index"
         options={{ title: "Manage Questions" }}
