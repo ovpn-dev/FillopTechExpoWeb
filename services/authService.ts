@@ -1,4 +1,4 @@
-// app/services/authService.ts - Updated with API integration
+// app/services/authService.ts - Enhanced with admin role validation
 import { LoginResponse, User } from "../types/auth.types";
 import apiService, { TokenStorage } from "./apiService";
 
@@ -47,7 +47,7 @@ export class AuthService {
       await TokenStorage.setToken(response.token);
 
       // Convert API user to app user format
-      const appUser = convertApiUserToAppUser(response.user as any);
+      const appUser = convertApiUserToAppUser(response as any);
 
       return {
         success: true,
@@ -62,8 +62,40 @@ export class AuthService {
   }
 
   /**
+   * Admin-specific login with role validation
+   */
+  static async loginAsAdmin(
+    email: string,
+    password: string
+  ): Promise<LoginResponse> {
+    try {
+      const loginResponse = await this.loginWithEmailPassword(email, password);
+      
+      if (loginResponse.success && loginResponse.user) {
+        // Validate admin role
+        if (loginResponse.user.role !== "admin") {
+          // Logout the non-admin user
+          await this.logout();
+          return {
+            success: false,
+            error: "Access denied. Administrator privileges required.",
+          };
+        }
+        
+        return loginResponse;
+      }
+      
+      return loginResponse;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Admin login failed.",
+      };
+    }
+  }
+
+  /**
    * Legacy passcode login (for backward compatibility during transition)
-   * This maintains the existing passcode flow while you transition users
    */
   static async loginWithPasscode(passcode: string): Promise<LoginResponse> {
     // Mock users for transition period - remove when all users have email/password
@@ -93,6 +125,20 @@ export class AuthService {
         registrationDate: "2024-02-01",
         username: "jane_smith",
         role: "student",
+      },
+      // Add a mock admin for testing
+      "admin1": {
+        id: "admin_001",
+        firstName: "Admin",
+        lastName: "User",
+        passcode: "admin1",
+        profileImage:
+          "https://ui-avatars.com/api/?name=Admin+User&background=dc2626&color=ffffff&size=128",
+        institution: "FILLOP TECH",
+        email: "admin@filloptech.com",
+        registrationDate: "2024-01-01",
+        username: "admin_user",
+        role: "admin",
       },
     };
 
@@ -130,7 +176,7 @@ export class AuthService {
         return null;
       }
 
-      const apiUser = await apiService.getMe(token);
+      const apiUser = await apiService.getMe();
       return convertApiUserToAppUser(apiUser as any);
     } catch (error) {
       console.error("Failed to get current user:", error);
@@ -147,6 +193,30 @@ export class AuthService {
     try {
       const user = await this.getCurrentUser();
       return !!user;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check if current user has admin role
+   */
+  static async isAdmin(): Promise<boolean> {
+    try {
+      const user = await this.getCurrentUser();
+      return user?.role === "admin";
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Validate user role
+   */
+  static async hasRole(requiredRole: string): Promise<boolean> {
+    try {
+      const user = await this.getCurrentUser();
+      return user?.role === requiredRole;
     } catch {
       return false;
     }
