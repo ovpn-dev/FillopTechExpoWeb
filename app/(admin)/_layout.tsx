@@ -25,12 +25,20 @@ export default function AdminLayout() {
     }
 
     const currentRoute = segments[segments.length - 1];
+    const isInAdminRoute = segments.includes('(admin)');
+    
     console.log("Admin layout check:", {
       isAuthenticated: authState.isAuthenticated,
       userRole: authState.user?.role,
       currentRoute,
-      segments
+      segments,
+      isInAdminRoute
     });
+
+    // Only apply admin checks if we're actually in an admin route
+    if (!isInAdminRoute) {
+      return;
+    }
 
     // If we're on login page and user is already authenticated admin, go to dashboard
     if (currentRoute === "login" && authState.isAuthenticated && authState.user?.role === "admin") {
@@ -51,7 +59,7 @@ export default function AdminLayout() {
       // If user is authenticated but not an admin, redirect to student portal
       if (authState.user.role !== "admin") {
         console.log("User is not an admin, redirecting to student portal");
-        setTimeout(() => router.replace("/cbtApp"), 50);
+        setTimeout(() => router.replace("/"), 50);
         return;
       }
     }
@@ -95,9 +103,9 @@ export default function AdminLayout() {
                 await logout();
                 router.replace("/(admin)/login");
               }}
-              className="mr-2"
+              className="mr-2 bg-red-600 px-3 py-2 rounded"
             >
-              <Text className="text-blue-600 font-medium">Logout</Text>
+              <Text className="text-white font-medium">Logout</Text>
             </TouchableOpacity>
           ),
         }} 
@@ -114,9 +122,9 @@ export default function AdminLayout() {
                 await logout();
                 router.replace("/(admin)/login");
               }}
-              className="mr-2"
+              className="mr-2  bg-red-600 px-3 py-2 rounded"
             >
-              <Text className="text-blue-600 font-medium">Logout</Text>
+              <Text className="text-white font-medium">Logout</Text>
             </TouchableOpacity>
           ),
         }}
@@ -137,9 +145,9 @@ export default function AdminLayout() {
                 await logout();
                 router.replace("/(admin)/login");
               }}
-              className="mr-2"
+              className="mr-2  bg-red-600 px-3 py-2 rounded"
             >
-              <Text className="text-blue-600 font-medium">Logout</Text>
+              <Text className="text-white font-medium">Logout</Text>
             </TouchableOpacity>
           ),
         }}
@@ -157,9 +165,9 @@ export default function AdminLayout() {
                 await logout();
                 router.replace("/(admin)/login");
               }}
-              className="mr-2"
+              className="mr-2 bg-red-600 px-3 py-2 rounded"
             >
-              <Text className="text-blue-600 font-medium">Logout</Text>
+              <Text className="text-white font-medium">Logout</Text>
             </TouchableOpacity>
           ),
         }}

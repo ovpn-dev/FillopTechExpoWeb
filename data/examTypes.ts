@@ -6,7 +6,7 @@ export const EXAM_MODES = [
   {
     key: "TIMED" as const,
     label: "TIMED EXAMS",
-    color: "bg-gray-700",
+    color: "bg-green-600",
     description: "Complete exam within set time limit",
   },
   {
