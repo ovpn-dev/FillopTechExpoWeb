@@ -1,16 +1,17 @@
-// app/(admin)/exams/index.tsx
+// app/(admin)/exams/index.tsx - Updated with Add Questions functionality
 import { Link, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import AdminApiService from "../../../services/adminApiService"; // Admin service for delete action
+import AdminApiService from "../../../services/adminApiService";
 import type { ExamPaperResponse } from "../../../services/apiService";
-import ApiService from "../../../services/apiService"; // Your main API service
+import ApiService from "../../../services/apiService";
 
 export default function ManageExamsScreen() {
   const [papers, setPapers] = useState<ExamPaperResponse[]>([]);
@@ -21,10 +22,11 @@ export default function ManageExamsScreen() {
   const fetchPapers = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await ApiService.getExamPapers();
       setPapers(data);
-      setError(null);
     } catch (err: any) {
+      console.error("Fetch papers error:", err);
       setError(err.message || "Failed to fetch exam papers.");
     } finally {
       setLoading(false);
@@ -36,15 +38,32 @@ export default function ManageExamsScreen() {
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this exam paper?")) {
-      try {
-        await AdminApiService.deleteExamPaper(id);
-        alert("Exam paper deleted successfully.");
-        fetchPapers(); // Refresh the list
-      } catch (err: any) {
-        alert("Failed to delete: " + err.message);
-      }
-    }
+    Alert.alert(
+      "Delete Exam Paper",
+      "Are you sure you want to delete this exam paper?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await AdminApiService.deleteExamPaper(id);
+              Alert.alert("Success", "Exam paper deleted successfully.");
+              fetchPapers();
+            } catch (err: any) {
+              console.error("Delete error:", err);
+              Alert.alert("Error", "Failed to delete: " + (err.message || "Unknown error"));
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const navigateToQuestions = (paperId: string) => {
+    // Navigate to the specific exam paper's questions page
+    router.push(`/exam-papers/${paperId}/questions`);
   };
 
   if (loading) {
@@ -78,34 +97,70 @@ export default function ManageExamsScreen() {
           </Text>
         </TouchableOpacity>
       </Link>
+      
       <FlatList
         data={papers}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View className="flex-row items-center p-3 mb-2 border border-gray-200 rounded-lg">
-            <View className="flex-1">
-              <Text className="text-lg font-semibold">{item.title}</Text>
-              <Text className="text-gray-600">ID: {item.id}</Text>
-              <Text className="text-gray-600">
-                Duration: {item.duration_minutes} mins
+          <View className="p-4 mb-3 border border-gray-200 rounded-lg bg-white shadow-sm">
+            <View className="mb-3">
+              <Text className="text-lg font-semibold text-gray-800">{item.title}</Text>
+              {item.description && (
+                <Text className="text-gray-600 mt-1">{item.description}</Text>
+              )}
+            </View>
+            
+            <View className="mb-3">
+              <Text className="text-gray-600 text-sm">ID: {item.id}</Text>
+              <Text className="text-gray-600 text-sm">
+                Duration: {item.exam_type_duration_minutes || 'N/A'} mins
+              </Text>
+              <Text className="text-gray-600 text-sm">
+                Type: {item.exam_type_name || 'N/A'}
+              </Text>
+              <Text className="text-gray-600 text-sm">
+                Questions: {item.question_count || 0}
               </Text>
             </View>
-            <View className="flex-row space-x-2">
+            
+            {/* Action buttons */}
+            <View className="flex-row flex-wrap gap-2">
+              {/* Add Questions - Primary Action */}
+              <TouchableOpacity
+                onPress={() => navigateToQuestions(item.id)}
+                className="bg-green-600 px-4 py-2 rounded flex-1 min-w-0"
+              >
+                <Text className="text-white text-center font-medium">
+                  Add Questions
+                </Text>
+              </TouchableOpacity>
+              
+              {/* Edit */}
               <TouchableOpacity
                 onPress={() => router.push(`/exams/${item.id}`)}
-                className="bg-yellow-500 p-2 rounded"
+                className="bg-yellow-500 px-4 py-2 rounded"
               >
                 <Text className="text-white">Edit</Text>
               </TouchableOpacity>
+              
+              {/* Delete */}
               <TouchableOpacity
                 onPress={() => handleDelete(item.id)}
-                className="bg-red-600 p-2 rounded"
+                className="bg-red-600 px-4 py-2 rounded"
               >
                 <Text className="text-white">Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
+        ListEmptyComponent={
+          <View className="flex-1 justify-center items-center py-20">
+            <Text className="text-gray-500 text-lg">No exam papers found</Text>
+            <Text className="text-gray-400 mt-2">
+              Create your first exam paper!
+            </Text>
+          </View>
+        }
       />
     </View>
   );

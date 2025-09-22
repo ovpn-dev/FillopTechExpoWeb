@@ -1,4 +1,4 @@
-// app/(admin)/exams/[id].tsx
+// app/(admin)/exams/[id].tsx - FIXED VERSION
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -10,8 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import AdminApiService from "../../../services/adminApiService"; // Admin service for create/update
-import ApiService from "../../../services/apiService"; // Main service for fetching
+import AdminApiService from "../../../services/adminApiService";
+import ApiService from "../../../services/apiService";
 
 export default function EditExamScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -19,9 +19,10 @@ export default function EditExamScreen() {
   const isNew = id === "new";
 
   const [title, setTitle] = useState("");
-  const [duration, setDuration] = useState("");
-  const [examId, setExamId] = useState(""); // This would be a dropdown in a real app
-  const [topicId, setTopicId] = useState(""); // Also a dropdown
+  const [description, setDescription] = useState("");
+  const [examId, setExamId] = useState(""); 
+  const [examTypeId, setExamTypeId] = useState(""); // FIXED: Use exam_type_id instead
+  const [topicId, setTopicId] = useState("");
 
   const [loading, setLoading] = useState(!isNew);
   const [submitting, setSubmitting] = useState(false);
@@ -33,11 +34,13 @@ export default function EditExamScreen() {
         try {
           const paper = await ApiService.getExamPaper(id);
           setTitle(paper.title);
-          setDuration(paper.duration_minutes?.toString() || "");
+          setDescription(paper.description || "");
           setExamId(paper.exam_id);
+          setExamTypeId(paper.exam_type_id); // FIXED: Get exam_type_id
           setTopicId(paper.topic_id || "");
         } catch (err: any) {
-          setError("Failed to load exam paper data.");
+          console.error("Fetch error:", err); // ADDED: Better debugging
+          setError("Failed to load exam paper data: " + (err.message || "Unknown error"));
         } finally {
           setLoading(false);
         }
@@ -47,17 +50,21 @@ export default function EditExamScreen() {
   }, [id, isNew]);
 
   const handleSubmit = async () => {
-    if (!title || !duration || !examId) {
-      Alert.alert("Validation Error", "Please fill in all required fields.");
+    // FIXED: Validate correct required fields
+    if (!title || !examId || !examTypeId) {
+      Alert.alert("Validation Error", "Please fill in title, exam ID, and exam type ID.");
       return;
     }
 
     setSubmitting(true);
+    
+    // FIXED: Use correct ExamPaperInput schema
     const paperData = {
       title,
-      duration_minutes: parseInt(duration),
-      exam_id: examId, // This should come from a dropdown of available ExamTypes
-      topic_id: topicId || undefined, // Optional
+      exam_id: examId,
+      exam_type_id: examTypeId, // FIXED: This is required
+      description: description || undefined,
+      topic_id: topicId || undefined,
     };
 
     try {
@@ -68,8 +75,9 @@ export default function EditExamScreen() {
         await AdminApiService.updateExamPaper(id!, paperData);
         Alert.alert("Success", "Exam paper updated successfully!");
       }
-      router.back(); // Go back to the list screen
+      router.back();
     } catch (err: any) {
+      console.error("Submit error:", err); // ADDED: Better debugging
       Alert.alert(
         "Submission Error",
         err.message || "An unknown error occurred."
@@ -94,7 +102,7 @@ export default function EditExamScreen() {
       </Text>
 
       <View className="mb-4">
-        <Text className="font-semibold mb-1 text-gray-700">Title</Text>
+        <Text className="font-semibold mb-1 text-gray-700">Title *</Text>
         <TextInput
           value={title}
           onChangeText={setTitle}
@@ -104,28 +112,37 @@ export default function EditExamScreen() {
       </View>
 
       <View className="mb-4">
-        <Text className="font-semibold mb-1 text-gray-700">
-          Duration (minutes)
-        </Text>
+        <Text className="font-semibold mb-1 text-gray-700">Description</Text>
         <TextInput
-          value={duration}
-          onChangeText={setDuration}
-          placeholder="e.g., 120"
-          keyboardType="numeric"
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Brief description of the exam paper"
+          multiline={true}
+          numberOfLines={3}
           className="bg-white p-3 border border-gray-300 rounded-lg"
         />
       </View>
 
       <View className="mb-4">
-        <Text className="font-semibold mb-1 text-gray-700">Exam Type ID</Text>
+        <Text className="font-semibold mb-1 text-gray-700">Exam ID *</Text>
         <TextInput
           value={examId}
           onChangeText={setExamId}
-          placeholder="Enter the UUID of the Exam Type (e.g., JAMB)"
+          placeholder="Enter the UUID of the Exam"
+          className="bg-white p-3 border border-gray-300 rounded-lg"
+        />
+      </View>
+
+      <View className="mb-4">
+        <Text className="font-semibold mb-1 text-gray-700">Exam Type ID *</Text>
+        <TextInput
+          value={examTypeId}
+          onChangeText={setExamTypeId}
+          placeholder="Enter the UUID of the Exam Type (determines duration)"
           className="bg-white p-3 border border-gray-300 rounded-lg"
         />
         <Text className="text-xs text-gray-500 mt-1">
-          Note: This should be a dropdown in the future.
+          The duration comes from the selected exam type, not set here.
         </Text>
       </View>
 
@@ -136,7 +153,7 @@ export default function EditExamScreen() {
         <TextInput
           value={topicId}
           onChangeText={setTopicId}
-          placeholder="Enter the UUID of the Topic (e.g., Mathematics)"
+          placeholder="Enter the UUID of the Topic"
           className="bg-white p-3 border border-gray-300 rounded-lg"
         />
       </View>

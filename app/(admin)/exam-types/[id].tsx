@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -20,8 +21,10 @@ export default function EditExamTypeScreen() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [maxSubjects, setMaxSubjects] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
+  const [isSimultaneous, setIsSimultaneous] = useState(false);
+  const [minPapersSimultaneous, setMinPapersSimultaneous] = useState("");
+  const [maxPapersSimultaneous, setMaxPapersSimultaneous] = useState("");
 
   const [loading, setLoading] = useState(!isNew);
   const [submitting, setSubmitting] = useState(false);
@@ -34,10 +37,12 @@ export default function EditExamTypeScreen() {
           const examType = await ApiService.getExamType(id);
           setName(examType.name);
           setDescription(examType.description || "");
-          setMaxSubjects(examType.max_subjects?.toString() || "");
           setDurationMinutes(examType.duration_minutes?.toString() || "");
+          setIsSimultaneous(examType.is_simultaneous);
+          setMinPapersSimultaneous(examType.min_papers_simultaneous?.toString() || "");
+          setMaxPapersSimultaneous(examType.max_papers_simultaneous?.toString() || "");
         } catch (err: any) {
-          setError("Failed to load exam type data.");
+          setError("Failed to load exam type data: " + err.message);
         } finally {
           setLoading(false);
         }
@@ -52,24 +57,34 @@ export default function EditExamTypeScreen() {
       return;
     }
 
+    if (!durationMinutes || isNaN(parseInt(durationMinutes))) {
+      Alert.alert("Validation Error", "Please enter a valid duration in minutes.");
+      return;
+    }
+
     setSubmitting(true);
     const examTypeData = {
       name: name.trim(),
       description: description.trim() || undefined,
-      max_subjects: maxSubjects ? parseInt(maxSubjects) : undefined,
-      duration_minutes: durationMinutes ? parseInt(durationMinutes) : undefined,
+      duration_minutes: parseInt(durationMinutes),
+      is_simultaneous: isSimultaneous,
+      min_papers_simultaneous: minPapersSimultaneous ? parseInt(minPapersSimultaneous) : undefined,
+      max_papers_simultaneous: maxPapersSimultaneous ? parseInt(maxPapersSimultaneous) : undefined,
     };
 
     try {
       if (isNew) {
-        await AdminApiService.createExamType(examTypeData);
+        const result = await AdminApiService.createExamType(examTypeData);
+        console.log("Created exam type:", result);
         Alert.alert("Success", "Exam type created successfully!");
       } else {
-        await AdminApiService.updateExamType(id!, examTypeData);
+        const result = await AdminApiService.updateExamType(id!, examTypeData);
+        console.log("Updated exam type:", result);
         Alert.alert("Success", "Exam type updated successfully!");
       }
       router.back();
     } catch (err: any) {
+      console.error("Submit error:", err);
       Alert.alert(
         "Submission Error",
         err.message || "An unknown error occurred."
@@ -119,35 +134,62 @@ export default function EditExamTypeScreen() {
 
       <View className="mb-4">
         <Text className="font-semibold mb-1 text-gray-700">
-          Maximum Subjects
-        </Text>
-        <TextInput
-          value={maxSubjects}
-          onChangeText={setMaxSubjects}
-          placeholder="e.g., 4 (leave empty if no limit)"
-          keyboardType="numeric"
-          className="bg-white p-3 border border-gray-300 rounded-lg"
-        />
-        <Text className="text-xs text-gray-500 mt-1">
-          Maximum number of subjects a student can take
-        </Text>
-      </View>
-
-      <View className="mb-8">
-        <Text className="font-semibold mb-1 text-gray-700">
-          Default Duration (minutes)
+          Duration (minutes) <Text className="text-red-500">*</Text>
         </Text>
         <TextInput
           value={durationMinutes}
           onChangeText={setDurationMinutes}
-          placeholder="e.g., 180 (leave empty if varies by paper)"
+          placeholder="e.g., 180"
           keyboardType="numeric"
           className="bg-white p-3 border border-gray-300 rounded-lg"
         />
         <Text className="text-xs text-gray-500 mt-1">
-          Default time allocation for this exam type
+          Duration of the exam in minutes
         </Text>
       </View>
+
+      <View className="mb-4">
+        <View className="flex-row justify-between items-center bg-white p-3 border border-gray-300 rounded-lg">
+          <Text className="font-semibold text-gray-700">Simultaneous Exam</Text>
+          <Switch
+            value={isSimultaneous}
+            onValueChange={setIsSimultaneous}
+          />
+        </View>
+        <Text className="text-xs text-gray-500 mt-1">
+          Whether multiple papers can be taken simultaneously
+        </Text>
+      </View>
+
+      {isSimultaneous && (
+        <>
+          <View className="mb-4">
+            <Text className="font-semibold mb-1 text-gray-700">
+              Minimum Simultaneous Papers
+            </Text>
+            <TextInput
+              value={minPapersSimultaneous}
+              onChangeText={setMinPapersSimultaneous}
+              placeholder="e.g., 2"
+              keyboardType="numeric"
+              className="bg-white p-3 border border-gray-300 rounded-lg"
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text className="font-semibold mb-1 text-gray-700">
+              Maximum Simultaneous Papers
+            </Text>
+            <TextInput
+              value={maxPapersSimultaneous}
+              onChangeText={setMaxPapersSimultaneous}
+              placeholder="e.g., 4"
+              keyboardType="numeric"
+              className="bg-white p-3 border border-gray-300 rounded-lg"
+            />
+          </View>
+        </>
+      )}
 
       <TouchableOpacity
         onPress={handleSubmit}
